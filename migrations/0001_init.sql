@@ -1,0 +1,20 @@
+CREATE TABLE ticks (
+  ts INTEGER NOT NULL,
+  region TEXT NOT NULL,
+  results TEXT NOT NULL,
+  PRIMARY KEY (ts, region)
+) WITHOUT ROWID;
+
+CREATE TABLE days (
+  day TEXT PRIMARY KEY,
+  stats TEXT NOT NULL,
+  lat TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE TABLE events (
+  monitor TEXT NOT NULL,
+  ts INTEGER NOT NULL,
+  state TEXT NOT NULL,
+  detail TEXT,
+  PRIMARY KEY (monitor, ts)
+) WITHOUT ROWID;

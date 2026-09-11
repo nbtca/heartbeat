@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "heartbeat",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "routes": [{ "pattern": "status.nbtca.space", "custom_domain": true }],
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [{ "binding": "DB", "database_name": "heartbeat", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }],
+  "vars": { "SITE_URL": "https://status.nbtca.space", "NOTIFY_URL": "https://webhook.nbtca.space/heartbeat" },
+  "build": { "command": "node scripts/build.ts", "watch_dir": "incidents" },
+  "rules": [
+    { "type": "Text", "globs": ["**/*.css", "**/*client.js"], "fallthrough": true },
+    { "type": "Data", "globs": ["**/*.webp"], "fallthrough": true }
+  ],
+  "observability": { "enabled": true }
+}
