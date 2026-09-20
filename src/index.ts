@@ -3,7 +3,8 @@ import type { Net } from './check.ts'
 import { tick, type Bindings } from './cron.ts'
 import { byId, monitors } from './data.ts'
 import { saveTick } from './db.ts'
-import logo from './logo.webp'
+import logo from './logo.svg'
+import { TEXT, type Text } from './text.ts'
 import { REGIONS, type Region, type Result, type Results } from './types.ts'
 import * as view from './view.ts'
 
@@ -54,17 +55,19 @@ async function ingest(req: Request, env: Bindings) {
   return new Response(null, { status: 204 })
 }
 
-const page = (p: view.Page) => new Response(view.layout(p), { status: p.status ?? 200, headers: HTML })
+const page = (p: view.Page, t: Text) => new Response(view.layout(p, t), { status: p.status ?? 200, headers: HTML })
 
 async function route(url: URL, env: Bindings): Promise<Response> {
-  const path = url.pathname
-  if (path === '/') return page(await view.home(env.DB))
-  if (path === '/history') return page(view.history())
-  if (path === '/feed.xml') return new Response(view.feed(env.SITE_URL), { headers: { ...CACHE, 'content-type': 'application/atom+xml; charset=utf-8' } })
-  if (path === '/api/status') return Response.json(await view.summary(env.DB), { headers: { ...CACHE, 'access-control-allow-origin': '*' } })
+  if (url.pathname === '/feed.xml') return new Response(view.feed(env.SITE_URL), { headers: { ...CACHE, 'content-type': 'application/atom+xml; charset=utf-8' } })
+  if (url.pathname === '/api/status') return Response.json(await view.summary(env.DB), { headers: { ...CACHE, 'access-control-allow-origin': '*' } })
+  const prefixed = url.pathname.match(/^\/zh(\/.*)?$/)
+  const t = TEXT[prefixed ? 'zh' : 'en']
+  const path = (prefixed ? (prefixed[1] ?? '/') : url.pathname).replace(/^(.+)\/$/, '$1')
+  if (path === '/') return page(await view.home(env.DB, t), t)
+  if (path === '/history') return page(view.history(t), t)
   const [, kind, id] = path.match(/^\/([ci])\/([\w.-]+)$/) ?? []
-  const found = kind === 'c' ? await view.component(env.DB, id) : kind === 'i' ? view.incident(id) : undefined
-  return page(found ?? view.notFound())
+  const found = kind === 'c' ? await view.component(env.DB, id, t) : kind === 'i' ? view.incident(id, t) : undefined
+  return page(found ?? view.notFound(t), t)
 }
 
 export default {
@@ -77,7 +80,7 @@ export default {
       return new Response('not found', { status: 404 })
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } })
-    if (url.pathname === '/logo.webp') return new Response(logo, { headers: { 'content-type': 'image/webp', 'cache-control': 'public, max-age=86400' } })
+    if (url.pathname === '/logo.svg') return new Response(logo, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' } })
     const key = new Request(url.origin + url.pathname)
     const hit = await caches.default.match(key)
     if (hit) return hit

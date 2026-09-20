@@ -9,8 +9,7 @@
   "vars": { "SITE_URL": "https://status.nbtca.space", "NOTIFY_URL": "https://webhook.nbtca.space/heartbeat" },
   "build": { "command": "node scripts/build.ts", "watch_dir": "incidents" },
   "rules": [
-    { "type": "Text", "globs": ["**/*.css", "**/*client.js"], "fallthrough": true },
-    { "type": "Data", "globs": ["**/*.webp"], "fallthrough": true }
+    { "type": "Text", "globs": ["**/*.css", "**/*.svg", "**/*client.js"], "fallthrough": true }
   ],
   "observability": { "enabled": true }
 }

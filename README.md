@@ -1,6 +1,6 @@
 # heartbeat
 
-Status page and uptime monitor for NBTCA services, served at <https://status.nbtca.space>.
+Status page and uptime monitor for NBTCA services, served at <https://status.nbtca.space>. The page is English by default; `/zh` serves the same page in Chinese.
 
 - Every service is checked once a minute from two vantage points: Cloudflare's edge (`global`) and a probe inside the China cluster (`cn`).
 - A check has to fail twice in a row before a service is marked down. A probe that stops reporting is shown as offline and ignored, so a dead probe never looks like an outage.
@@ -32,12 +32,15 @@ States: operational, degraded (slower than `slowMs` or flapping), partial (fails
 
 Edit [`monitors.ts`](monitors.ts). Both probes pick up the change on the next deploy.
 
-Services are grouped, and a group marked `infra: true` moves out of the main panel into a collapsed "开发与基础设施" section, which opens by itself when something in it is wrong. The headline, the 60-minute trace, and `state` in `/api/status` cover the main panel only, so an internal tool going down does not tell a visitor the site is broken. Infrastructure is still checked and still alerts.
+Services are grouped, and a group marked `infra: true` moves out of the main panel into a collapsed "Developer & infrastructure" section, which opens by itself when something in it is wrong. The headline, the 60-minute trace, and `state` in `/api/status` cover the main panel only, so an internal tool going down does not tell a visitor the site is broken. Infrastructure is still checked and still alerts.
+
+Names are English. Give a group or a service a `zh` to have `/zh` show a Chinese name instead; without one it keeps the English. Everything else on the page comes from [`src/text.ts`](src/text.ts), where both languages have to define the same keys or the build fails.
 
 | Field | Meaning |
 |---|---|
 | `id` | stable identifier used in URLs, incidents, and stored data |
-| `name` | label shown on the page |
+| `name` | English label shown on the page |
+| `zh` | Chinese label for `/zh`; falls back to `name` |
 | `http` | URL to request; any status below 400 counts as up |
 | `tcp` | `host:port` to open a connection to, instead of `http` |
 | `status` | exact status code to expect, e.g. `401` for a registry's `/v2/` |
@@ -47,20 +50,20 @@ Services are grouped, and a group marked `infra: true` moves out of the main pan
 
 ## Writing an incident
 
-Add `incidents/<slug>.md`; merging to `main` publishes it. Times are China time.
+Add `incidents/<slug>.md`; merging to `main` publishes it. Write incidents in English — they are not translated, and `/zh` shows the same text. Times are China time.
 
 ```md
 ---
-title: 维修预约无法提交
+title: Repair bookings could not be submitted
 impact: major
 components: repair, api
 ---
 
 ## identified 2026-09-10 21:43
-数据库连接池耗尽，正在扩容。
+The database connection pool was exhausted. Scaling it up.
 
 ## resolved 2026-09-10 23:24
-已扩容，服务恢复。
+Pool resized, the service is back.
 ```
 
 `impact` is `minor`, `major`, or `critical`, and raises the listed components to degraded, partial, or major while the incident is open. Update statuses are `investigating`, `identified`, `monitoring`, `resolved`. The incident closes at its `resolved` update.
@@ -69,14 +72,14 @@ Scheduled maintenance declares its window and puts the components into maintenan
 
 ```md
 ---
-title: 机房电路改造
+title: Server room rewiring
 impact: maintenance
 components: mc
 start: 2026-09-20 08:00
 end: 2026-09-20 12:00
 ---
 
-周六上午停电维护，Minecraft 服务器暂停开放。
+Power is off on Saturday morning; the Minecraft server will be unavailable.
 ```
 
 Add a `## completed <time>` update to end it early. Bodies support paragraphs, `- ` lists, `` `code` ``, and `[links](https://…)`. The build fails on unknown components or malformed files.
@@ -124,7 +127,7 @@ The probe runs TypeScript directly on Node 24 and imports the same check code as
   "state": "operational",
   "updated": 1757550000,
   "probes": { "cn": 1757550000, "global": 1757550000 },
-  "groups": [{ "name": "维修服务", "infra": false, "components": [{ "id": "api", "name": "维修 API", "state": "operational", "since": 1757000000, "failed": [], "error": null }] }],
+  "groups": [{ "name": "Repair service", "infra": false, "components": [{ "id": "api", "name": "Repair API", "state": "operational", "since": 1757000000, "failed": [], "error": null }] }],
   "incidents": []
 }
 ```

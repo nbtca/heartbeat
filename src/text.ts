@@ -1,47 +1,226 @@
 import type { Impact, Status } from './incidents.ts'
 import type { Region, State } from './types.ts'
 
-export const STATE: Record<State, string> = {
-  operational: '正常',
-  degraded: '响应缓慢',
-  partial: '部分中断',
-  major: '严重中断',
-  maintenance: '维护中',
-  nodata: '暂无数据',
+export type Lang = 'en' | 'zh'
+export const LANGS: Lang[] = ['en', 'zh']
+
+const TZ = 'Asia/Shanghai'
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+const zhCat = (a: string, b: string) => ((/[\w)]$/.test(a) && /^[一-鿿]/.test(b)) || (/[一-鿿]$/.test(a) && /^[\w(]/.test(b)) ? `${a} ${b}` : a + b)
+
+function clock(locale: string) {
+  const fmt = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, { timeZone: TZ, ...opts })
+  const dateFmt = fmt({ month: 'long', day: 'numeric', weekday: 'short' })
+  const timeFmt = fmt({ hour: '2-digit', minute: '2-digit', hour12: false })
+  const fullFmt = fmt({ year: 'numeric', month: 'long', day: 'numeric' })
+  const monthFmt = fmt({ year: 'numeric', month: 'long' })
+  const date = (ts: number) => dateFmt.format(ts * 1000)
+  const time = (ts: number) => timeFmt.format(ts * 1000)
+  return { date, time, fullDate: (ts: number) => fullFmt.format(ts * 1000), month: (ts: number) => monthFmt.format(ts * 1000), dateTime: (ts: number) => `${date(ts)} ${time(ts)}` }
 }
 
-export const REGION: Record<Region, string> = { cn: '境内', global: '境外' }
-
-export const STATUS: Record<Status, string> = {
-  investigating: '调查中',
-  identified: '已定位',
-  monitoring: '观察中',
-  resolved: '已解决',
-  scheduled: '计划中',
-  in_progress: '进行中',
-  completed: '已完成',
+const en = {
+  lang: 'en' as Lang,
+  locale: 'en',
+  dir: '',
+  other: '中文',
+  otherHref: '/zh',
+  scope: (names: string) => ` affecting ${names}`,
+  ongoing: (range: string) => `In progress, ${range}`,
+  metaJoin: '. ',
+  site: 'NBTCA Status',
+  desc: 'Live status, uptime and incident history for NBTCA services',
+  subscribe: 'Subscribe',
+  footer: 'Checked every minute from two vantage points, inside and outside China',
+  back: 'All services',
+  services: 'Services',
+  past90: 'Past 90 days',
+  infra: 'Developer & infrastructure',
+  lastHour: 'Past 60 minutes',
+  hourAgo: '60 minutes ago',
+  now: 'Now',
+  recent: 'Recent incidents',
+  allHistory: 'Full history',
+  noRecent: 'No incidents in the past 14 days.',
+  historyTitle: 'Incident history',
+  noHistory: 'No incidents recorded yet.',
+  collecting: 'Collecting data',
+  collectingLede: 'Once the probes report their first results, every service shows up here.',
+  allGood: 'All systems operational',
+  latency: 'Response time',
+  noLatency: 'No response times in the past 24 hours yet.',
+  past30: 'Past 30 days',
+  probe: 'Probe',
+  median: 'Median',
+  p95: 'P95',
+  cert: 'HTTPS certificate',
+  certExpired: 'Certificate has expired',
+  changes: 'Recent status changes',
+  noChanges: 'No recent status changes.',
+  related: 'Related incidents',
+  affects: 'Affected services',
+  notFound: 'Page not found',
+  notFoundBody: 'Nothing lives at this address. The service or incident may have been removed.',
+  notFoundLink: 'Back to service status',
+  noDowntime: 'No downtime recorded',
+  noData: 'No data',
+  allFine: 'All operational',
+  overallTrace: 'Overall status over the past 60 minutes',
+  state: { operational: 'Operational', degraded: 'Degraded', partial: 'Partial outage', major: 'Major outage', maintenance: 'Maintenance', nodata: 'No data' } as Record<State, string>,
+  region: { cn: 'China', global: 'Global' } as Record<Region, string>,
+  status: {
+    investigating: 'Investigating',
+    identified: 'Identified',
+    monitoring: 'Monitoring',
+    resolved: 'Resolved',
+    scheduled: 'Scheduled',
+    in_progress: 'In progress',
+    completed: 'Completed',
+  } as Record<Status, string>,
+  impact: { minor: 'Minor', major: 'Major', critical: 'Critical', maintenance: 'Scheduled maintenance' } as Record<Impact, string>,
+  headline: { degraded: 'Some services are slow', partial: 'Some services are partly down', major: 'Some services are down', maintenance: 'Some services are under maintenance' } as Partial<Record<State, string>>,
+  cat: (a: string, b: string) => `${a} ${b}`,
+  stop: '.',
+  listSep: ', ',
+  colon: ': ',
+  paren: (s: string) => ` (${s})`,
+  oneAffected: (name: string, state: string) => `${name} is ${state.toLowerCase()}`,
+  count: (n: number) => plural(n, 'service'),
+  uptime: (p: string) => `${p} uptime`,
+  everyFine: (n: number) => `${plural(n, 'service')} running normally.`,
+  restFine: (n: number) => (n ? ` ${plural(n, 'other service')} running normally.` : ''),
+  probeLabel: (region: string) => `${region} probe`,
+  probeOff: (region: string) => `${region} probe offline`,
+  probeDown: (region: string) => `The ${region} probe went offline; the page now shows the other probe only`,
+  probeUp: (region: string) => `The ${region} probe is reporting again`,
+  recovered: (name: string, prev: string, lasted: string) => `${name} recovered after ${lasted} of ${prev.toLowerCase()}`,
+  maintaining: 'Scheduled maintenance is under way',
+  declared: 'An incident has been published',
+  failedAll: 'Every probe failed to reach it twice in a row',
+  failedOne: 'Only one probe reached it',
+  failedFrom: (regions: string) => `The ${regions} probe failed twice in a row; other regions are fine`,
+  slowerThan: (s: number) => `Slower than ${s} s, or results are unstable`,
+  lastedFor: (d: string) => `for ${d}`,
+  since: (d: string) => `Ongoing for ${d}`,
+  uptimeOver: (label: string) => label,
+  today: 'Today',
+  daysAgo90: '90 days ago',
+  windows: [['Today', 1], ['7 days', 7], ['30 days', 30], ['90 days', 90]] as [string, number][],
+  certLeft: (n: number, on: string) => `${plural(n, 'day')} left, expires ${on}`,
+  incidentAt: (i: string) => `Event: ${i}`,
+  impactOf: { 3: 'Major outage', 2: 'Partial outage', 1: 'Degraded', 4: 'Maintenance' } as Record<number, string>,
+  phase: { planned: 'Scheduled', ongoing: 'In progress', done: 'Completed', resolved: 'Resolved', open: 'Investigating' },
+  starts: (t: string) => `Started ${t}`,
+  from: (t: string) => `From ${t}`,
+  between: (a: string, b: string) => `${a} to ${b}`,
+  plannedFor: (t: string) => `Scheduled for ${t}`,
+  duration: (seconds: number) => {
+    const m = Math.max(1, Math.round(seconds / 60))
+    if (m < 60) return plural(m, 'minute')
+    if (m < 1440) return plural(Math.floor(m / 60), 'hour') + (m % 60 ? ` ${plural(m % 60, 'minute')}` : '')
+    return plural(Math.floor(m / 1440), 'day') + (m % 1440 >= 60 ? ` ${plural(Math.floor((m % 1440) / 60), 'hour')}` : '')
+  },
+  ...clock('en'),
 }
 
-export const IMPACT: Record<Impact, string> = { minor: '轻微影响', major: '较大影响', critical: '严重影响', maintenance: '计划维护' }
+export type Text = typeof en
 
-export const cat = (a: string, b: string) =>
-  (/[\w)]$/.test(a) && /^[一-鿿]/.test(b)) || (/[一-鿿]$/.test(a) && /^[\w(]/.test(b)) ? `${a} ${b}` : a + b
-
-export function duration(seconds: number): string {
-  const m = Math.max(1, Math.round(seconds / 60))
-  if (m < 60) return `${m} 分钟`
-  if (m < 1440) return `${Math.floor(m / 60)} 小时${m % 60 ? ` ${m % 60} 分钟` : ''}`
-  return `${Math.floor(m / 1440)} 天${m % 1440 >= 60 ? ` ${Math.floor((m % 1440) / 60)} 小时` : ''}`
+const zh: Text = {
+  lang: 'zh',
+  locale: 'zh-CN',
+  dir: '/zh',
+  other: 'English',
+  otherHref: '/',
+  scope: (names) => `，涉及${names}`,
+  ongoing: (range) => `维护中，${range}`,
+  metaJoin: '。',
+  site: 'NBTCA 服务状态',
+  desc: 'NBTCA 各项服务的实时状态、可用率与事件记录',
+  subscribe: '订阅更新',
+  footer: '每分钟从境内、境外两个探测点各检测一次',
+  back: '全部服务',
+  services: '服务',
+  past90: '过去 90 天',
+  infra: '开发与基础设施',
+  lastHour: '最近 60 分钟',
+  hourAgo: '60 分钟前',
+  now: '现在',
+  recent: '近期事件',
+  allHistory: '全部历史',
+  noRecent: '过去 14 天没有事件。',
+  historyTitle: '历史事件',
+  noHistory: '还没有记录过事件。',
+  collecting: '正在收集数据',
+  collectingLede: '探测点上报第一批结果后，这里会显示各项服务的状态。',
+  allGood: '一切正常',
+  latency: '响应时间',
+  noLatency: '最近 24 小时还没有响应时间数据。',
+  past30: '过去 30 天',
+  probe: '探测点',
+  median: '中位数',
+  p95: 'P95',
+  cert: 'HTTPS 证书',
+  certExpired: '证书已过期',
+  changes: '最近状态变化',
+  noChanges: '近期没有状态变化。',
+  related: '相关事件',
+  affects: '涉及服务',
+  notFound: '页面不存在',
+  notFoundBody: '这个地址没有对应的页面，可能对应的服务或事件已被移除。',
+  notFoundLink: '返回服务状态',
+  noDowntime: '无中断记录',
+  noData: '无数据',
+  allFine: '全部正常',
+  overallTrace: '最近 60 分钟的整体状态',
+  state: { operational: '正常', degraded: '响应缓慢', partial: '部分中断', major: '严重中断', maintenance: '维护中', nodata: '暂无数据' },
+  region: { cn: '境内', global: '境外' },
+  status: { investigating: '调查中', identified: '已定位', monitoring: '观察中', resolved: '已解决', scheduled: '计划中', in_progress: '进行中', completed: '已完成' },
+  impact: { minor: '轻微影响', major: '较大影响', critical: '严重影响', maintenance: '计划维护' },
+  headline: { degraded: '部分服务响应缓慢', partial: '部分服务出现中断', major: '部分服务严重中断', maintenance: '部分服务正在维护' },
+  cat: zhCat,
+  stop: '。',
+  listSep: '、',
+  colon: '：',
+  paren: (s) => `（${s}）`,
+  oneAffected: (name, state) => zhCat(name, state),
+  count: (n) => `${n} 项`,
+  uptime: (p) => `${p} 可用`,
+  everyFine: (n) => `全部 ${n} 项服务运行正常。`,
+  restFine: (n) => (n ? `其余 ${n} 项服务运行正常。` : ''),
+  probeLabel: (region) => `${region}探测点`,
+  probeOff: (region) => `${region}探测点离线`,
+  probeDown: (region) => `${region}探测点已离线，页面暂时只显示其他探测点的结果`,
+  probeUp: (region) => `${region}探测点已恢复上报`,
+  recovered: (name, prev, lasted) => `${name}已恢复，${prev}持续 ${lasted}`,
+  maintaining: '正在进行计划维护',
+  declared: '已发布事件公告',
+  failedAll: '境内外探测点均连续访问失败',
+  failedOne: '探测点连续访问失败',
+  failedFrom: (regions) => `${regions}探测点连续访问失败，其他地区访问正常`,
+  slowerThan: (s) => `响应时间超过 ${s} 秒或结果不稳定`,
+  lastedFor: (d) => `，持续 ${d}`,
+  since: (d) => `已持续 ${d}`,
+  uptimeOver: (label) => `${label}可用率`,
+  today: '今天',
+  daysAgo90: '90 天前',
+  windows: [['今天', 1], ['7 天', 7], ['30 天', 30], ['90 天', 90]],
+  certLeft: (n, on) => `还有 ${n} 天到期（${on}）`,
+  incidentAt: (i) => `事件：${i}`,
+  impactOf: { 3: '严重中断', 2: '部分中断', 1: '响应缓慢', 4: '维护' },
+  phase: { planned: '计划中', ongoing: '进行中', done: '已完成', resolved: '已解决', open: '处理中' },
+  starts: (t) => `${t} 开始`,
+  from: (t) => `${t} 起`,
+  between: (a, b) => `${a} 至 ${b}`,
+  plannedFor: (t) => `计划于${t}`,
+  duration: (seconds) => {
+    const m = Math.max(1, Math.round(seconds / 60))
+    if (m < 60) return `${m} 分钟`
+    if (m < 1440) return `${Math.floor(m / 60)} 小时${m % 60 ? ` ${m % 60} 分钟` : ''}`
+    return `${Math.floor(m / 1440)} 天${m % 1440 >= 60 ? ` ${Math.floor((m % 1440) / 60)} 小时` : ''}`
+  },
+  ...clock('zh-CN'),
 }
 
-const fmt = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', ...opts })
-const dateFmt = fmt({ month: 'long', day: 'numeric', weekday: 'short' })
-const timeFmt = fmt({ hour: '2-digit', minute: '2-digit', hour12: false })
-const fullFmt = fmt({ year: 'numeric', month: 'long', day: 'numeric' })
-const monthFmt = fmt({ year: 'numeric', month: 'long' })
+export const TEXT: Record<Lang, Text> = { en, zh }
 
-export const date = (ts: number) => dateFmt.format(ts * 1000)
-export const time = (ts: number) => timeFmt.format(ts * 1000)
-export const fullDate = (ts: number) => fullFmt.format(ts * 1000)
-export const month = (ts: number) => monthFmt.format(ts * 1000)
-export const dateTime = (ts: number) => `${date(ts)} ${time(ts)}`
+export const label = (x: { name: string; zh?: string }, t: Text) => (t.lang === 'zh' && x.zh) || x.name

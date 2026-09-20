@@ -45,7 +45,8 @@ addEventListener('pointermove', (e) => {
 
 addEventListener('scroll', hide, { passive: true })
 
-const ago = (s) => (s < 60 ? `${s} 秒前` : s < 3600 ? `${Math.floor(s / 60)} 分钟前` : `${Math.floor(s / 3600)} 小时前`)
+const rtf = new Intl.RelativeTimeFormat(document.documentElement.lang || 'en', { numeric: 'auto' })
+const ago = (s) => (s < 60 ? rtf.format(-s, 'second') : s < 3600 ? rtf.format(-Math.floor(s / 60), 'minute') : rtf.format(-Math.floor(s / 3600), 'hour'))
 
 function clock() {
   for (const el of document.querySelectorAll('[data-since]')) {

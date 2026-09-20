@@ -6,7 +6,7 @@ import { html, raw, type Raw } from './html.ts'
 import { escape, type Incident } from './incidents.ts'
 import css from './page.css'
 import { barColor, downtime, lastDays, merge, percentile, stateAt, uptime, window, worst, type Counts, type Day, type Verdict } from './status.ts'
-import { cat, date, dateTime, duration, fullDate, IMPACT, month, REGION, STATE, STATUS, time } from './text.ts'
+import { label, LANGS, TEXT, type Text } from './text.ts'
 import { REGIONS, type Group, type Monitor, type Region, type State, type Tick } from './types.ts'
 
 export interface Page {
@@ -15,15 +15,8 @@ export interface Page {
   status?: number
 }
 
-const SITE = 'NBTCA 服务状态'
 const DAYS = 90
 const IMPACT_STATE = { minor: 'degraded', major: 'partial', critical: 'major', maintenance: 'maintenance' } as const
-const HEADLINE: Partial<Record<State, string>> = {
-  degraded: '部分服务响应缓慢',
-  partial: '部分服务出现中断',
-  major: '部分服务严重中断',
-  maintenance: '部分服务正在维护',
-}
 const BEAT = 'h2.5q.6 -2.4 1.2 0h.5l.4 2l.7 -22l.7 25l.4 -5h.6q.8 -5 1.6 0h1.4'
 
 const minute = () => Math.floor(Date.now() / 60000) * 60
@@ -31,10 +24,10 @@ const noon = (day: string) => Date.parse(`${day}T12:00:00+08:00`) / 1000
 const calm = (s: State) => s === 'operational' || s === 'nodata'
 const pct = (u?: number) => (u === undefined ? '—' : u === 1 ? '100%' : `${(Math.floor(u * 10000) / 100).toFixed(2)}%`)
 const ms = (v: number) => (v >= 1000 ? `${Number((v / 1000).toPrecision(2))} s` : `${Number(v.toPrecision(2))} ms`)
-const list = (items: unknown[]) => items.flatMap((x, i) => (i ? ['、', x] : [x]))
+const list = (items: unknown[], sep: string) => items.flatMap((x, i) => (i ? [sep, x] : [x]))
 
 const icon = (s: State) => html`<svg class="icon" data-state="${s}" aria-hidden="true"><use href="#i-${s}"/></svg>`
-const badge = (s: State) => html`<span class="badge">${icon(s)}${STATE[s]}</span>`
+const badge = (s: State, t: Text) => html`<span class="badge">${icon(s)}${t.state[s]}</span>`
 
 const SPRITE = raw(`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <symbol id="i-operational" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" stroke="none"/><path fill="none" d="M4.8 8.3l2.1 2.1 4.3-4.6"/></symbol>
@@ -45,22 +38,27 @@ const SPRITE = raw(`<svg width="0" height="0" style="position:absolute" aria-hid
 <symbol id="i-nodata" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" stroke="none"/><path fill="none" d="M5.3 8h5.4"/></symbol>
 </defs></svg>`)
 
-export function layout(p: Page): string {
+const at = (t: Text, path = '') => `${t.dir}${path}` || '/'
+
+export function layout(p: Page, t: Text): string {
   return `<!doctype html>${
-    html`<html lang="zh-CN"><head>
+    html`<html lang="${t.locale}"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${p.title ? `${p.title} - ${SITE}` : SITE}</title>
-<meta name="description" content="NBTCA 各项服务的实时状态、可用率与事件记录">
-<link rel="icon" href="/logo.webp" type="image/webp">
-<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="${SITE}">
+<title>${p.title ? `${p.title} - ${t.site}` : t.site}</title>
+<meta name="description" content="${t.desc}">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="${t.site}">
+${LANGS.map((l) => html`<link rel="alternate" hreflang="${TEXT[l].locale}" href="${at(TEXT[l])}">`)}
 <style>${raw(css)}</style>
 </head><body>
 ${SPRITE}
 <div class="wrap">
-<header class="top"><a class="brand" href="/"><img src="/logo.webp" alt="" width="28" height="28">${SITE}</a><a class="subscribe" href="/feed.xml">订阅更新</a></header>
+<header class="top"><a class="brand" href="${at(t)}"><img src="/logo.svg" alt="" width="28" height="28">${t.site}</a><nav class="links"><a href="${t.otherHref}" lang="${
+      t.lang === 'en' ? 'zh-CN' : 'en'
+    }">${t.other}</a><a href="/feed.xml">${t.subscribe}</a></nav></header>
 <main>${p.body}</main>
-<footer class="foot"><span>每分钟从境内、境外两个探测点各检测一次</span><a href="https://github.com/nbtca/heartbeat">GitHub</a></footer>
+<footer class="foot"><span>${t.footer}</span><a href="https://github.com/nbtca/heartbeat">GitHub</a></footer>
 </div>
 <script>${raw(client)}</script>
 </body></html>`.value
@@ -69,17 +67,18 @@ ${SPRITE}
 
 interface Live {
   ts: number
+  t: Text
   recent: Tick[]
   verdicts: Map<string, Verdict>
   seen: Partial<Record<Region, number>>
 }
 
-async function live(DB: D1Database, ts: number, span = 0): Promise<Live> {
+async function live(DB: D1Database, ts: number, t: Text, span = 0): Promise<Live> {
   const recent = await db.ticksSince(DB, ts - span - 180)
   const w = window(recent, ts)
   const seen: Partial<Record<Region, number>> = {}
-  for (const t of recent) seen[t.region] = Math.max(seen[t.region] ?? 0, t.ts)
-  return { ts, recent, verdicts: new Map(monitors.map((m) => [m.id, stateAt(m, w, ts, incidents)])), seen }
+  for (const x of recent) seen[x.region] = Math.max(seen[x.region] ?? 0, x.ts)
+  return { ts, t, recent, verdicts: new Map(monitors.map((m) => [m.id, stateAt(m, w, ts, incidents)])), seen }
 }
 
 function related(ids: string[], day: string, now: number) {
@@ -87,20 +86,15 @@ function related(ids: string[], day: string, now: number) {
   return incidents.filter((i) => i.components.some((c) => ids.includes(c)) && i.start < from + 86400 && (i.end ?? now) >= from)
 }
 
-function impact(c?: Counts): string[] {
+function impact(c: Counts | undefined, t: Text): string[] {
   if (!c) return []
-  return [
-    c[3] && `严重中断 ${duration(c[3] * 60)}`,
-    c[2] && `部分中断 ${duration(c[2] * 60)}`,
-    c[1] && `响应缓慢 ${duration(c[1] * 60)}`,
-    c[4] && `维护 ${duration(c[4] * 60)}`,
-  ].filter((x): x is string => !!x)
+  return ([3, 2, 1, 4] as const).filter((k) => c[k]).map((k) => `${t.impactOf[k]} ${t.duration(c[k] * 60)}`)
 }
 
 const measured = (c?: Counts) => !!c && c[0] + c[1] + c[2] + c[3] + c[4] > 0
 
-function tip(day: string, lines: string[], hasData: boolean, rel: Incident[]) {
-  return [date(noon(day)), ...(lines.length ? lines : [hasData ? '无中断记录' : '无数据']), ...rel.map((i) => `事件：${i.title}`)].join('\n')
+function tip(day: string, lines: string[], hasData: boolean, rel: Incident[], t: Text) {
+  return [t.date(noon(day)), ...(lines.length ? lines : [hasData ? t.noDowntime : t.noData]), ...rel.map((i) => t.incidentAt(i.title))].join('\n')
 }
 
 function combine(cs: (Counts | undefined)[]): Counts | undefined {
@@ -109,33 +103,36 @@ function combine(cs: (Counts | undefined)[]): Counts | undefined {
   return pick
 }
 
-const strip = (cells: { color: string; tip: string }[], label: string) =>
-  html`<div class="bars" role="img" aria-label="${label}">${cells.map((c) => html`<i style="--c:${c.color}" data-tip="${c.tip}"></i>`)}</div>`
+const strip = (cells: { color: string; tip: string }[], caption: string) =>
+  html`<div class="bars" role="img" aria-label="${caption}">${cells.map((c) => html`<i style="--c:${c.color}" data-tip="${c.tip}"></i>`)}</div>`
 
-function explain(m: Monitor, v: Verdict, ts: number): string {
-  if (v.state === 'maintenance') return '正在进行计划维护'
+function explain(m: Monitor, v: Verdict, ts: number, t: Text): string {
+  if (v.state === 'maintenance') return t.maintaining
   const declared = incidents.some((i) => i.impact !== 'maintenance' && i.components.includes(m.id) && ts >= i.start && ts < (i.end ?? Infinity))
-  if (declared && !v.failed.length) return '已发布事件公告'
-  const err = v.err ? `（${v.err}）` : ''
-  if (v.state === 'major') return `${(m.regions ?? REGIONS).length > 1 ? '境内外探测点均' : '探测点'}连续访问失败${err}`
-  if (v.state === 'partial') return `${v.failed.map((r) => REGION[r]).join('、')}探测点连续访问失败${err}，其他地区访问正常`
-  return `响应时间超过 ${(m.slowMs ?? SLOW_MS) / 1000} 秒或结果不稳定`
+  if (declared && !v.failed.length) return t.declared
+  const err = v.err ? t.paren(v.err) : ''
+  if (v.state === 'major') return ((m.regions ?? REGIONS).length > 1 ? t.failedAll : t.failedOne) + err
+  if (v.state === 'partial') return t.failedFrom(v.failed.map((r) => t.region[r]).join(t.listSep)) + err
+  return t.slowerThan((m.slowMs ?? SLOW_MS) / 1000)
 }
 
 function hero(l: Live) {
+  const t = l.t
   const state = (m: Monitor) => l.verdicts.get(m.id)!.state
   const affected = core.filter((m) => !calm(state(m)))
   const fine = core.filter((m) => state(m) === 'operational').length
-  const rest = fine ? `其余 ${fine} 项服务运行正常。` : ''
   const overall = worst(core.map(state))
   const [title, lede] =
     overall === 'nodata'
-      ? ['正在收集数据', '探测点上报第一批结果后，这里会显示各项服务的状态。']
+      ? [t.collecting, t.collectingLede]
       : !affected.length
-        ? ['一切正常', `全部 ${core.length} 项服务运行正常。`]
+        ? [t.allGood, t.everyFine(core.length)]
         : affected.length === 1
-          ? [cat(affected[0].name, STATE[state(affected[0])]), `${explain(affected[0], l.verdicts.get(affected[0].id)!, l.ts)}。${rest}`]
-          : [HEADLINE[overall]!, `${affected.map((m) => cat(m.name, STATE[state(m)])).join('、')}。${rest}`]
+          ? [
+              t.oneAffected(label(affected[0], t), t.state[state(affected[0])]),
+              `${explain(affected[0], l.verdicts.get(affected[0].id)!, l.ts, t)}${t.stop}${t.restFine(fine)}`,
+            ]
+          : [t.headline[overall]!, `${affected.map((m) => t.cat(label(m, t), t.state[state(m)])).join(t.listSep)}${t.stop}${t.restFine(fine)}`]
   return html`<section class="hero"><div class="banner" data-state="${overall}"><h1>${icon(overall)}${title}</h1><p class="lede">${lede}</p></div></section>`
 }
 
@@ -143,124 +140,130 @@ function probes(l: Live) {
   return html`<p class="probes">${REGIONS.map((r) => {
     const last = l.seen[r]
     return last && last > l.ts - 180
-      ? html`<span class="probe" data-on>${REGION[r]}探测点 <span data-since="${last}">${time(last)} 更新</span></span>`
-      : html`<span class="probe">${REGION[r]}探测点离线</span>`
+      ? html`<span class="probe" data-on>${l.t.probeLabel(l.t.region[r])} <span data-since="${last}">${l.t.time(last)}</span></span>`
+      : html`<span class="probe">${l.t.probeOff(l.t.region[r])}</span>`
   })}</p>`
 }
 
 function pulse(l: Live) {
+  const t = l.t
   const beats = Array.from({ length: 60 }, (_, i) => {
-    const t = l.ts - (59 - i) * 60
-    const w = window(l.recent, t)
-    const vs = core.map((m) => [m, stateAt(m, w, t, incidents)] as const)
-    return { t, state: worst(vs.map(([, v]) => v.state)), hurt: vs.filter(([, v]) => !calm(v.state)) }
+    const at = l.ts - (59 - i) * 60
+    const w = window(l.recent, at)
+    const vs = core.map((m) => [m, stateAt(m, w, at, incidents)] as const)
+    return { at, state: worst(vs.map(([, v]) => v.state)), hurt: vs.filter(([, v]) => !calm(v.state)) }
   })
   const latest = Math.max(0, ...Object.values(l.seen))
   return html`<figure class="pulse intro" data-latest="${latest}">
-<div class="trace"><svg viewBox="0 0 600 56" preserveAspectRatio="none" role="img" aria-label="最近 60 分钟的整体状态">${beats.map((b, i) =>
+<div class="trace"><svg viewBox="0 0 600 56" preserveAspectRatio="none" role="img" aria-label="${t.overallTrace}">${beats.map((b, i) =>
     b.state === 'nodata' ? html`<path class="flat" d="M${i * 10} 36h10"/>` : html`<path data-state="${b.state}" d="M${i * 10} 36${BEAT}"/>`,
   )}${beats.map(
     (b, i) =>
       html`<rect x="${i * 10}" width="10" height="56" data-tip="${[
-        time(b.t),
-        ...(b.hurt.length ? b.hurt.map(([m, v]) => cat(m.name, STATE[v.state])) : [b.state === 'nodata' ? '无数据' : '全部正常']),
+        t.time(b.at),
+        ...(b.hurt.length ? b.hurt.map(([m, v]) => t.cat(label(m, t), t.state[v.state])) : [b.state === 'nodata' ? t.noData : t.allFine]),
       ].join('\n')}"/>`,
   )}</svg><span class="live" data-state="${beats[59].state}"></span></div>
-<figcaption><span>60 分钟前</span><span>现在</span></figcaption>
+<figcaption><span>${t.hourAgo}</span><span>${t.now}</span></figcaption>
 </figure>`
 }
 
 function group(g: Group, l: Live, days: string[], counts: (id: string) => (Counts | undefined)[]) {
+  const t = l.t
   const state = worst(g.items.map((m) => l.verdicts.get(m.id)!.state))
   const per = g.items.map((m) => counts(m.id))
   const ups = per.map(uptime).filter((u) => u !== undefined)
   const up = ups.length ? ups.reduce((a, b) => a + b) / ups.length : undefined
   const ids = g.items.map((m) => m.id)
+  const name = label(g, t)
   const cells = days.map((d, i) => {
     const cs = per.map((c) => c[i])
-    const lines = g.items.flatMap((m, j) => impact(cs[j]).map((t) => cat(m.name, t)))
-    return { color: barColor(combine(cs)), tip: tip(d, lines, cs.some(measured), related(ids, d, l.ts)) }
+    const lines = g.items.flatMap((m, j) => impact(cs[j], t).map((x) => t.cat(label(m, t), x)))
+    return { color: barColor(combine(cs)), tip: tip(d, lines, cs.some(measured), related(ids, d, l.ts), t) }
   })
   return html`<details class="group" data-key="${g.name}"${calm(state) ? '' : raw(' open')}>
-<summary><span class="row">${icon(state)}<span class="name">${g.name}</span>${
-    calm(state) ? html`<span class="count">${g.items.length} 项</span>` : html`<span class="note">${STATE[state]}</span>`
-  }<span class="uptime">${pct(up)} 可用</span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></span>${strip(
+<summary><span class="row">${icon(state)}<span class="name">${name}</span>${
+    calm(state) ? html`<span class="count">${t.count(g.items.length)}</span>` : html`<span class="note">${t.state[state]}</span>`
+  }<span class="uptime">${t.uptime(pct(up))}</span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></span>${strip(
     cells,
-    `${g.name}过去 90 天可用率 ${pct(up)}`,
+    `${name} ${t.uptime(pct(up))}`,
   )}</summary>
-<ul class="members">${g.items.map((m, j) => member(m, l.verdicts.get(m.id)!, days, per[j], l.ts))}</ul>
+<ul class="members">${g.items.map((m, j) => member(m, l.verdicts.get(m.id)!, days, per[j], l.ts, t))}</ul>
 </details>`
 }
 
 function advanced(gs: Group[], l: Live, days: string[], counts: (id: string) => (Counts | undefined)[]) {
+  const t = l.t
   const items = gs.flatMap((g) => g.items)
   const state = worst(items.map((m) => l.verdicts.get(m.id)!.state))
   return html`<details class="advanced" data-key="infra"${calm(state) ? '' : raw(' open')}>
-<summary>${icon(state)}<span class="name">开发与基础设施</span>${
-    calm(state) ? html`<span class="count">${items.length} 项</span>` : html`<span class="note">${STATE[state]}</span>`
+<summary>${icon(state)}<span class="name">${t.infra}</span>${
+    calm(state) ? html`<span class="count">${t.count(items.length)}</span>` : html`<span class="note">${t.state[state]}</span>`
   }<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
 <div class="panel">${gs.map((g) => group(g, l, days, counts))}</div>
 </details>`
 }
 
-function member(m: Monitor, v: Verdict, days: string[], cs: (Counts | undefined)[], now: number) {
+function member(m: Monitor, v: Verdict, days: string[], cs: (Counts | undefined)[], now: number, t: Text) {
   const up = uptime(cs)
-  const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i]), measured(cs[i]), related([m.id], d, now)) }))
-  const where = v.failed.length === 1 && v.state === 'partial' ? `（${REGION[v.failed[0]]}）` : ''
-  return html`<li><div class="row">${icon(v.state)}<a class="name" href="/c/${m.id}">${m.name}</a>${
-    v.state === 'operational' ? '' : html`<span class="note">${STATE[v.state]}${where}</span>`
-  }<span class="uptime">${pct(up)} 可用</span></div>${strip(cells, `${m.name}过去 90 天可用率 ${pct(up)}`)}</li>`
+  const name = label(m, t)
+  const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i], t), measured(cs[i]), related([m.id], d, now), t) }))
+  const where = v.failed.length === 1 && v.state === 'partial' ? t.paren(t.region[v.failed[0]]) : ''
+  return html`<li><div class="row">${icon(v.state)}<a class="name" href="${at(t, `/c/${m.id}`)}">${name}</a>${
+    v.state === 'operational' ? '' : html`<span class="note">${t.state[v.state]}${where}</span>`
+  }<span class="uptime">${t.uptime(pct(up))}</span></div>${strip(cells, `${name} ${t.uptime(pct(up))}`)}</li>`
 }
 
-function range(i: Incident) {
-  if (i.end === undefined) return `${dateTime(i.start)} 起`
-  return date(i.start) === date(i.end) ? `${dateTime(i.start)} 至 ${time(i.end)}` : `${dateTime(i.start)} 至 ${dateTime(i.end)}`
+function range(i: Incident, t: Text) {
+  if (i.end === undefined) return t.from(t.dateTime(i.start))
+  return t.date(i.start) === t.date(i.end) ? t.between(t.dateTime(i.start), t.time(i.end)) : t.between(t.dateTime(i.start), t.dateTime(i.end))
 }
 
-const names = (i: Incident) => i.components.map((c) => byId.get(c)?.name ?? c).join('、')
+const names = (i: Incident, t: Text) => i.components.map((c) => (byId.has(c) ? label(byId.get(c)!, t) : c)).join(t.listSep)
 
-function notice(i: Incident, ts: number) {
+function notice(i: Incident, ts: number, t: Text) {
   const u = i.updates[0]
-  const scope = i.components.length ? cat('，涉及', names(i)) : ''
-  const when = i.impact === 'maintenance' ? `${ts < i.start ? '计划于' : '维护中，'}${range(i)}` : `${dateTime(i.start)} 开始`
+  const scope = i.components.length ? t.scope(names(i, t)) : ''
+  const when = i.impact === 'maintenance' ? (ts < i.start ? t.plannedFor(range(i, t)) : t.ongoing(range(i, t))) : t.starts(t.dateTime(i.start))
   return html`<article class="notice" data-state="${IMPACT_STATE[i.impact]}">
-<h2><a href="/i/${i.id}">${i.title}</a></h2>
-<p class="meta">${IMPACT[i.impact]}${scope}。${when}</p>
-${u ? html`<div class="update"><p class="status">${STATUS[u.status]}<time>${dateTime(u.ts)}</time></p>${raw(u.html)}</div>` : raw(i.html)}
+<h2><a href="${at(t, `/i/${i.id}`)}">${i.title}</a></h2>
+<p class="meta">${t.impact[i.impact]}${scope}${t.metaJoin}${when}</p>
+${u ? html`<div class="update"><p class="status">${t.status[u.status]}<time>${t.dateTime(u.ts)}</time></p>${raw(u.html)}</div>` : raw(i.html)}
 </article>`
 }
 
-const item = (i: Incident) => html`<li>${icon(IMPACT_STATE[i.impact])}<a href="/i/${i.id}">${i.title}</a><span class="when">${range(i)}</span></li>`
+const item = (i: Incident, t: Text) =>
+  html`<li>${icon(IMPACT_STATE[i.impact])}<a href="${at(t, `/i/${i.id}`)}">${i.title}</a><span class="when">${range(i, t)}</span></li>`
 
-export async function home(DB: D1Database): Promise<Page> {
+export async function home(DB: D1Database, t: Text): Promise<Page> {
   const ts = minute()
   const days = lastDays(ts, DAYS)
-  const [l, stats] = await Promise.all([live(DB, ts, 3600), db.loadDays(DB, days[0])])
+  const [l, stats] = await Promise.all([live(DB, ts, t, 3600), db.loadDays(DB, days[0])])
   const counts = (id: string) => days.map((d) => stats.get(d)?.stats[id])
   const open = incidents.filter((i) => (i.end ?? Infinity) > ts).sort((a, b) => a.start - b.start)
   const past = incidents.filter((i) => i.end !== undefined && i.end <= ts && i.end > ts - 14 * 86400)
   return {
     body: html`${hero(l)}
-${open.length ? html`<section class="notices" aria-label="进行中的事件">${open.map((i) => notice(i, ts))}</section>` : ''}
+${open.length ? html`<section class="notices" aria-label="${t.recent}">${open.map((i) => notice(i, ts, t))}</section>` : ''}
 <section aria-labelledby="services">
-<div class="section-head"><h2 id="services">服务</h2><span>过去 90 天</span></div>
-<ul class="services">${core.map((m) => member(m, l.verdicts.get(m.id)!, days, counts(m.id), l.ts))}</ul>
+<div class="section-head"><h2 id="services">${t.services}</h2><span>${t.past90}</span></div>
+<ul class="services">${core.map((m) => member(m, l.verdicts.get(m.id)!, days, counts(m.id), l.ts, t))}</ul>
 ${groups.some((g) => g.infra) ? advanced(groups.filter((g) => g.infra), l, days, counts) : ''}
 </section>
 <section aria-labelledby="pulse">
-<div class="section-head"><h2 id="pulse">最近 60 分钟</h2></div>
+<div class="section-head"><h2 id="pulse">${t.lastHour}</h2></div>
 ${probes(l)}${pulse(l)}
 </section>
 <section aria-labelledby="recent">
-<div class="section-head"><h2 id="recent">近期事件</h2><a href="/history">全部历史</a></div>
-${past.length ? html`<ul class="incidents">${past.map(item)}</ul>` : html`<p class="empty">过去 14 天没有事件。</p>`}
+<div class="section-head"><h2 id="recent">${t.recent}</h2><a href="${at(t, '/history')}">${t.allHistory}</a></div>
+${past.length ? html`<ul class="incidents">${past.map((i) => item(i, t))}</ul>` : html`<p class="empty">${t.noRecent}</p>`}
 </section>`,
   }
 }
 
 type Point = Awaited<ReturnType<typeof db.series>>[number]
 
-function chart(points: Point[], ts: number, regions: Region[]) {
+function chart(points: Point[], ts: number, regions: Region[], t: Text) {
   const N = 288
   const BIN = 300
   const start = ts - N * BIN
@@ -273,17 +276,17 @@ function chart(points: Point[], ts: number, regions: Region[]) {
     return { region, values: bins.map((b) => (b.length ? b.toSorted((x, y) => x - y)[b.length >> 1] : null)) }
   })
   const peak = Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== null)))
-  if (!peak) return html`<p class="empty">最近 24 小时还没有响应时间数据。</p>`
+  if (!peak) return html`<p class="empty">${t.noLatency}</p>`
   const max = [100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000, 20000].find((n) => n >= peak) ?? peak
   const x = (i: number) => ((i / (N - 1)) * 720).toFixed(1)
   const y = (v: number) => 176 - (v / max) * 168
   const d = (vs: (number | null)[]) => vs.map((v, i) => (v === null ? '' : `${i && vs[i - 1] !== null ? 'L' : 'M'}${x(i)} ${y(v).toFixed(1)}`)).join('')
   const data = {
-    times: Array.from({ length: N }, (_, i) => time(start + i * BIN)),
-    series: series.map((s) => ({ label: REGION[s.region], text: s.values.map((v) => (v === null ? '无数据' : ms(v))) })),
+    times: Array.from({ length: N }, (_, i) => t.time(start + i * BIN)),
+    series: series.map((s) => ({ label: t.region[s.region], text: s.values.map((v) => (v === null ? t.noData : ms(v))) })),
   }
   return html`<figure class="chart">
-<ul class="legend">${series.map((s) => html`<li style="--c:var(--${s.region})">${REGION[s.region]}</li>`)}</ul>
+<ul class="legend">${series.map((s) => html`<li style="--c:var(--${s.region})">${t.region[s.region]}</li>`)}</ul>
 <div class="plot" data-chart="${JSON.stringify(data)}">
 <svg viewBox="0 0 720 180" preserveAspectRatio="none" aria-hidden="true">${[0.5, 1].map(
     (f) => html`<line class="grid" x1="0" x2="720" y1="${y(max * f)}" y2="${y(max * f)}"/>`,
@@ -291,29 +294,29 @@ function chart(points: Point[], ts: number, regions: Region[]) {
 ${[0.5, 1].map((f) => html`<span class="ylabel" style="top:${((y(max * f) / 180) * 100).toFixed(1)}%">${ms(max * f)}</span>`)}
 <div class="cursor" hidden></div>
 </div>
-<div class="axis">${[0, 6, 12, 18].map((h) => html`<span>${time(start + h * 3600)}</span>`)}<span>现在</span></div>
+<div class="axis">${[0, 6, 12, 18].map((h) => html`<span>${t.time(start + h * 3600)}</span>`)}<span>${t.now}</span></div>
 </figure>`
 }
 
-function latency(lat: Map<string, Day>, days: string[], id: string, regions: Region[]) {
+function latency(lat: Map<string, Day>, days: string[], id: string, regions: Region[], t: Text) {
   const rows = regions.map((r) => {
     const h = merge(days.map((d) => lat.get(d)?.lat[id]?.[r]))
     return [r, percentile(h, 0.5), percentile(h, 0.95)] as const
   })
   if (rows.every(([, p50]) => p50 === undefined)) return ''
   const cell = (v?: number) => (v === undefined ? '—' : ms(v))
-  return html`<table class="lat"><caption>过去 30 天</caption>
-<thead><tr><th scope="col">探测点</th><th scope="col">中位数</th><th scope="col">P95</th></tr></thead>
-<tbody>${rows.map(([r, p50, p95]) => html`<tr><th scope="row">${REGION[r]}</th><td>${cell(p50)}</td><td>${cell(p95)}</td></tr>`)}</tbody></table>`
+  return html`<table class="lat"><caption>${t.past30}</caption>
+<thead><tr><th scope="col">${t.probe}</th><th scope="col">${t.median}</th><th scope="col">${t.p95}</th></tr></thead>
+<tbody>${rows.map(([r, p50, p95]) => html`<tr><th scope="row">${t.region[r]}</th><td>${cell(p50)}</td><td>${cell(p95)}</td></tr>`)}</tbody></table>`
 }
 
-export async function component(DB: D1Database, id: string): Promise<Page | undefined> {
+export async function component(DB: D1Database, id: string, t: Text): Promise<Page | undefined> {
   const m = byId.get(id)
   if (!m) return
   const ts = minute()
   const days = lastDays(ts, DAYS)
   const [l, stats, lat, points, events] = await Promise.all([
-    live(DB, ts),
+    live(DB, ts, t),
     db.loadDays(DB, days[0]),
     db.loadDays(DB, days[DAYS - 30], true),
     db.series(DB, id, ts - 86400),
@@ -324,96 +327,99 @@ export async function component(DB: D1Database, id: string): Promise<Page | unde
   const since = events[0]?.state === v.state ? events[0].ts : undefined
   const regions = m.regions ?? REGIONS
   const cert = points.findLast((p) => p.r.cert !== undefined)?.r.cert
-  const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i]), measured(cs[i]), related([id], d, ts)) }))
+  const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i], t), measured(cs[i]), related([id], d, ts), t) }))
   const mine = incidents.filter((i) => i.components.includes(id))
+  const name = label(m, t)
   return {
-    title: m.name,
-    body: html`<a class="back" href="/">全部服务</a>
+    title: name,
+    body: html`<a class="back" href="${at(t)}">${t.back}</a>
 <section class="detail">
-<h1>${m.name}</h1>
-<p class="now">${badge(v.state)}${since ? html`<span class="meta">已持续 ${duration(ts - since)}</span>` : ''}${v.err ? html`<code>${v.err}</code>` : ''}</p>
+<h1>${name}</h1>
+<p class="now">${badge(v.state, t)}${since ? html`<span class="meta">${t.since(t.duration(ts - since))}</span>` : ''}${v.err ? html`<code>${v.err}</code>` : ''}</p>
 <p class="target">${m.http ?? m.tcp}</p>
-<dl class="uptimes">${(
-      [
-        ['今天', 1],
-        ['7 天', 7],
-        ['30 天', 30],
-        ['90 天', 90],
-      ] as const
-    ).map(([label, n]) => html`<div><dt>${label}可用率</dt><dd>${pct(uptime(cs.slice(-n)))}</dd></div>`)}</dl>
-${strip(cells, `过去 90 天可用率 ${pct(uptime(cs))}`)}
-<div class="axis"><span>90 天前</span><span>今天</span></div>
+<dl class="uptimes">${t.windows.map(([lbl, n]) => html`<div><dt>${t.uptimeOver(lbl)}</dt><dd>${pct(uptime(cs.slice(-n)))}</dd></div>`)}</dl>
+${strip(cells, t.uptime(pct(uptime(cs))))}
+<div class="axis"><span>${t.daysAgo90}</span><span>${t.today}</span></div>
 </section>
-<section class="block"><h2>响应时间</h2>${chart(points, ts, regions)}${latency(lat, days.slice(-30), id, regions)}</section>
+<section class="block"><h2>${t.latency}</h2>${chart(points, ts, regions, t)}${latency(lat, days.slice(-30), id, regions, t)}</section>
 ${
   cert === undefined
     ? ''
-    : html`<section class="block"><h2>HTTPS 证书</h2><p class="now badge">${icon(cert < 0 ? 'major' : cert <= 14 ? 'degraded' : 'operational')}<span>${
-        cert < 0 ? '证书已过期' : `还有 ${cert} 天到期（${fullDate(ts + cert * 86400)}）`
+    : html`<section class="block"><h2>${t.cert}</h2><p class="now badge">${icon(cert < 0 ? 'major' : cert <= 14 ? 'degraded' : 'operational')}<span>${
+        cert < 0 ? t.certExpired : t.certLeft(cert, t.fullDate(ts + cert * 86400))
       }</span></p></section>`
 }
-<section class="block"><h2>最近状态变化</h2>${
+<section class="block"><h2>${t.changes}</h2>${
       events.length
         ? html`<ol class="events">${events.map(
             (e) =>
-              html`<li><time>${dateTime(e.ts)}</time>${badge(e.state)}${e.detail?.failed.length ? html`<span class="meta">${e.detail.failed.map((r) => REGION[r]).join('、')}</span>` : ''}${
-                e.detail?.err ? html`<code>${e.detail.err}</code>` : ''
-              }</li>`,
+              html`<li><time>${t.dateTime(e.ts)}</time>${badge(e.state, t)}${
+                e.detail?.failed.length ? html`<span class="meta">${e.detail.failed.map((r) => t.region[r]).join(t.listSep)}</span>` : ''
+              }${e.detail?.err ? html`<code>${e.detail.err}</code>` : ''}</li>`,
           )}</ol>`
-        : html`<p class="empty">近期没有状态变化。</p>`
+        : html`<p class="empty">${t.noChanges}</p>`
     }</section>
-${mine.length ? html`<section class="block"><h2>相关事件</h2><ul class="incidents">${mine.map(item)}</ul></section>` : ''}`,
+${mine.length ? html`<section class="block"><h2>${t.related}</h2><ul class="incidents">${mine.map((i) => item(i, t))}</ul></section>` : ''}`,
   }
 }
 
-export function incident(id: string): Page | undefined {
+export function incident(id: string, t: Text): Page | undefined {
   const i = incidents.find((x) => x.id === id)
   if (!i) return
   const ts = minute()
   const phase =
-    i.impact === 'maintenance' ? (ts < i.start ? '计划中' : ts < i.end! ? '进行中' : '已完成') : i.end !== undefined && i.end <= ts ? '已解决' : '处理中'
-  const links = i.components.map((c) => html`<a href="/c/${c}">${byId.get(c)?.name ?? c}</a>`)
+    i.impact === 'maintenance'
+      ? ts < i.start
+        ? t.phase.planned
+        : ts < i.end!
+          ? t.phase.ongoing
+          : t.phase.done
+      : i.end !== undefined && i.end <= ts
+        ? t.phase.resolved
+        : t.phase.open
+  const links = i.components.map((c) => html`<a href="${at(t, `/c/${c}`)}">${byId.has(c) ? label(byId.get(c)!, t) : c}</a>`)
   return {
     title: i.title,
-    body: html`<a class="back" href="/">全部服务</a>
+    body: html`<a class="back" href="${at(t)}">${t.back}</a>
 <article class="incident">
-<p class="kind">${icon(IMPACT_STATE[i.impact])}${IMPACT[i.impact]}，${phase}</p>
+<p class="kind">${icon(IMPACT_STATE[i.impact])}${t.impact[i.impact]}${t.metaJoin}${phase}</p>
 <h1>${i.title}</h1>
-<p class="meta">${range(i)}${i.end !== undefined && i.end <= ts ? `，持续 ${duration(i.end - i.start)}` : ''}</p>
-${links.length ? html`<p class="meta">涉及服务：${list(links)}</p>` : ''}
+<p class="meta">${range(i, t)}${i.end !== undefined && i.end <= ts ? t.lastedFor(t.duration(i.end - i.start)) : ''}</p>
+${links.length ? html`<p class="meta">${t.affects}${t.colon}${list(links, t.listSep)}</p>` : ''}
 ${raw(i.html)}
 ${
   i.updates.length
-    ? html`<ol class="timeline">${i.updates.map((u) => html`<li><h2>${STATUS[u.status]}</h2><time>${dateTime(u.ts)}</time>${raw(u.html)}</li>`)}</ol>`
+    ? html`<ol class="timeline">${i.updates.map((u) => html`<li><h2>${t.status[u.status]}</h2><time>${t.dateTime(u.ts)}</time>${raw(u.html)}</li>`)}</ol>`
     : ''
 }
 </article>`,
   }
 }
 
-export function history(): Page {
-  const months = Map.groupBy(incidents, (i) => month(i.start))
+export function history(t: Text): Page {
+  const months = Map.groupBy(incidents, (i) => t.month(i.start))
   return {
-    title: '历史事件',
-    body: html`<a class="back" href="/">全部服务</a>
-<h1 class="page-title">历史事件</h1>
+    title: t.historyTitle,
+    body: html`<a class="back" href="${at(t)}">${t.back}</a>
+<h1 class="page-title">${t.historyTitle}</h1>
 ${
   incidents.length
-    ? [...months].map(([name, items]) => html`<section class="month"><h2>${name}</h2><ul class="incidents">${items.map(item)}</ul></section>`)
-    : html`<p class="empty" style="margin-top:16px">还没有记录过事件。</p>`
+    ? [...months].map(([name, items]) => html`<section class="month"><h2>${name}</h2><ul class="incidents">${items.map((i) => item(i, t))}</ul></section>`)
+    : html`<p class="empty" style="margin-top:16px">${t.noHistory}</p>`
 }`,
   }
 }
 
-export const notFound = (): Page => ({
-  title: '页面不存在',
+export const notFound = (t: Text): Page => ({
+  title: t.notFound,
   status: 404,
-  body: html`<h1 class="page-title">页面不存在</h1><p>这个地址没有对应的页面，可能对应的服务或事件已被移除。</p><p><a href="/">返回服务状态</a></p>`,
+  body: html`<h1 class="page-title">${t.notFound}</h1><p>${t.notFoundBody}</p><p><a href="${at(t)}">${t.notFoundLink}</a></p>`,
 })
 
 export async function summary(DB: D1Database) {
+  const t = TEXT.en
   const ts = minute()
-  const [l, last] = await Promise.all([live(DB, ts), db.lastEvents(DB)])
+  const [l, last] = await Promise.all([live(DB, ts, t), db.lastEvents(DB)])
   return {
     state: worst(core.map((m) => l.verdicts.get(m.id)!.state)),
     updated: ts,
@@ -436,14 +442,15 @@ export async function summary(DB: D1Database) {
 const iso = (ts: number) => new Date(ts * 1000).toISOString()
 
 export function feed(site: string): string {
+  const t = TEXT.en
   const recent = incidents.slice(0, 50)
   const updated = (i: Incident) => i.updates[0]?.ts ?? i.start
   const entry = (i: Incident) => {
-    const body = i.html + i.updates.map((u) => `<p><strong>${STATUS[u.status]}</strong> ${dateTime(u.ts)}</p>${u.html}`).join('')
+    const body = i.html + i.updates.map((u) => `<p><strong>${t.status[u.status]}</strong> ${t.dateTime(u.ts)}</p>${u.html}`).join('')
     return `<entry><id>${site}/i/${i.id}</id><title>${escape(i.title)}</title><link href="${site}/i/${i.id}"/><published>${iso(i.start)}</published><updated>${iso(updated(i))}</updated><content type="html">${escape(body)}</content></entry>`
   }
   return `<?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><id>${site}/</id><title>${SITE}</title><link href="${site}/"/><link rel="self" href="${site}/feed.xml"/><updated>${iso(
+<feed xmlns="http://www.w3.org/2005/Atom"><id>${site}/</id><title>${t.site}</title><link href="${site}/"/><link rel="self" href="${site}/feed.xml"/><updated>${iso(
     Math.max(minute() - 86400 * 365, ...recent.map(updated)),
   )}</updated>${recent.map(entry).join('')}</feed>`
 }

@@ -6,7 +6,7 @@
   --muted: #676273;
   --faint: #938e9f;
   --line: #e3e0e9;
-  --brand: #8129d9;
+  --brand: #124689;
   --operational: #0ca30c;
   --degraded: #fab219;
   --partial: #ec835a;
@@ -25,7 +25,7 @@
     --muted: #a39eb0;
     --faint: #736e80;
     --line: #2b2735;
-    --brand: #ad7cf2;
+    --brand: #7ba6e6;
     --nodata: #36313f;
     --cn: #9466e3;
     --global: #2a95b0;
@@ -90,7 +90,9 @@ code {
   text-decoration: none;
 }
 
-.subscribe {
+.links {
+  display: flex;
+  gap: 18px;
   font-size: 14px;
   color: var(--muted);
 }

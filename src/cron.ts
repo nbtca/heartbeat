@@ -2,7 +2,7 @@ import { run, type Net } from './check.ts'
 import { byId, incidents, monitors } from './data.ts'
 import * as db from './db.ts'
 import { dayOf, record, sample, stateAt, window, type Verdict } from './status.ts'
-import { cat, duration, REGION, STATE } from './text.ts'
+import { TEXT } from './text.ts'
 import { REGIONS, type Region, type State, type Tick } from './types.ts'
 
 export type Bindings = Env & { PROBE_TOKEN: string; NOTIFY_TOKEN?: string }
@@ -41,18 +41,20 @@ async function transition(env: Bindings, ts: number, online: Set<Region>, verdic
   await Promise.all(changed.map((e) => notify(env, e, last.get(e.monitor))))
 }
 
+const t = TEXT.en
+
 function message(e: db.Event, prev: db.Event): string | undefined {
   if (e.monitor.startsWith('region:')) {
-    const region = REGION[e.monitor.slice(7) as Region]
-    return e.state === 'nodata' ? `${region}探测点已离线，页面暂时只显示其他探测点的结果` : `${region}探测点已恢复上报`
+    const region = t.region[e.monitor.slice(7) as Region]
+    return e.state === 'nodata' ? t.probeDown(region) : t.probeUp(region)
   }
   const name = byId.get(e.monitor)?.name ?? e.monitor
   if (ALERT.includes(e.state)) {
-    const where = e.detail?.failed.length === 1 ? `（${REGION[e.detail.failed[0]]}）` : ''
-    return `${cat(name, STATE[e.state])}${where}${e.detail?.err ? `：${e.detail.err}` : ''}`
+    const where = e.detail?.failed.length === 1 ? ` (${t.region[e.detail.failed[0]]})` : ''
+    return `${name}: ${t.state[e.state]}${where}${e.detail?.err ? ` — ${e.detail.err}` : ''}`
   }
   if (ALERT.includes(prev.state) && (e.state === 'operational' || e.state === 'degraded')) {
-    return `${cat(name, '已恢复')}，${STATE[prev.state]}持续 ${duration(e.ts - prev.ts)}`
+    return t.recovered(name, t.state[prev.state], t.duration(e.ts - prev.ts))
   }
 }
 
