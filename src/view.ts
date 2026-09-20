@@ -29,10 +29,13 @@ const list = (items: unknown[], sep: string) => items.flatMap((x, i) => (i ? [se
 const icon = (s: State) => html`<svg class="icon" data-state="${s}" aria-hidden="true"><use href="#i-${s}"/></svg>`
 const badge = (s: State, t: Text) => html`<span class="badge">${icon(s)}${t.state[s]}</span>`
 const CHEV = raw('<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>')
+const RSS = raw(
+  '<svg class="rss" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.3" cy="12.7" r="1.5" fill="currentColor" stroke="none"/><path d="M2.6 8.1a5.3 5.3 0 0 1 5.3 5.3M2.6 3.6a9.8 9.8 0 0 1 9.8 9.8"/></svg>',
+)
 
 const heading = (state: State, name: string, n: number, t: Text) =>
   html`${icon(state)}<span class="name">${name}</span>${
-    calm(state) ? html`<span class="count">${t.count(n)}</span>` : html`<span class="note">${t.state[state]}</span>`
+    calm(state) ? html`<span class="count">${t.count(n)}</span>` : html`<span class="note" data-state="${state}">${t.state[state]}</span>`
   }`
 
 const SPRITE = raw(`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -62,7 +65,7 @@ ${SPRITE}
 <div class="wrap">
 <header class="top"><a class="brand" href="${at(t)}"><img src="/logo.svg" alt="" width="28" height="28">${t.site}</a><nav class="links"><a href="${t.otherHref}" lang="${
       t.lang === 'en' ? 'zh-CN' : 'en'
-    }">${t.other}</a><a href="/feed.xml">${t.subscribe}</a></nav></header>
+    }">${t.other}</a><a href="/feed.xml">${RSS}${t.subscribe}</a></nav></header>
 <main>${p.body}</main>
 <footer class="foot"><span>${t.footer}</span><a href="https://github.com/nbtca/heartbeat">GitHub</a></footer>
 </div>
@@ -212,7 +215,7 @@ function member(m: Monitor, v: Verdict, days: string[], cs: (Counts | undefined)
   const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i], t), measured(cs[i]), related([m.id], d, now), t) }))
   const where = v.failed.length === 1 && v.state === 'partial' ? t.paren(t.region[v.failed[0]]) : ''
   return html`<li><div class="row">${icon(v.state)}<a class="name" href="${at(t, `/c/${m.id}`)}">${name}</a>${
-    v.state === 'operational' ? '' : html`<span class="note">${t.state[v.state]}${where}</span>`
+    v.state === 'operational' ? '' : html`<span class="note" data-state="${v.state}">${t.state[v.state]}${where}</span>`
   }<span class="uptime">${t.uptime(pct(up))}</span></div>${strip(cells, `${name} ${t.uptime(pct(up))}`)}</li>`
 }
 

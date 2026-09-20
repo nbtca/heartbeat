@@ -1,12 +1,36 @@
-# heartbeat
+<h1 align="center">heartbeat</h1>
 
-Status page for NBTCA services at <https://status.nbtca.space>, English with Chinese at `/zh`.
+<p align="center">Status page and uptime monitor for NBTCA, on Cloudflare Workers and D1.</p>
 
-Each service is checked every minute from Cloudflare's edge and from a probe inside the China cluster. A check has to fail twice in a row before the service is marked down, and a probe that stops reporting is ignored rather than counted as an outage.
+<p align="center">
+  <a href="https://status.nbtca.space"><img alt="status.nbtca.space" src="https://img.shields.io/website?url=https%3A%2F%2Fstatus.nbtca.space&label=status.nbtca.space&labelColor=124689&color=1e8e3e"></a>
+  <a href="https://github.com/nbtca/heartbeat/actions/workflows/deploy.yml"><img alt="deploy" src="https://github.com/nbtca/heartbeat/actions/workflows/deploy.yml/badge.svg"></a>
+</p>
+
+<p align="center"><img alt="Eight services, each with ninety days of uptime" src="screenshot.webp" width="820"></p>
+
+- Checked every minute from Cloudflare's edge and from a probe inside the China cluster
+- Two failures in a row before a service is marked down; a probe that stops reporting is ignored, not counted as an outage
+- 90 days of uptime per service, a live 60-minute trace, latency and TLS expiry per region
+- Incidents and maintenance windows written as Markdown in the repo
+- English at `/`, Chinese at `/zh`
+- No dependencies: one Worker, one D1 database
 
 ## Adding a service
 
-Edit [`monitors.ts`](monitors.ts). Past `id`, `name` and a `zh` translation, a monitor takes `http` or `tcp`, then optionally `status` when the endpoint answers something other than 2xx (a registry's `/v2/` answers `401`), `expect` for a substring the body must contain, `slowMs` to move the slow threshold off 3000, and `regions` to check from one side only.
+```ts
+// monitors.ts
+{
+  name: 'Repair service',
+  zh: '维修服务',
+  items: [
+    { id: 'repair', name: 'Repair booking', zh: '维修预约', http: 'https://repair.nbtca.space' },
+    { id: 'api', name: 'Repair API', zh: '维修 API', http: 'https://api.nbtca.space/ping' },
+  ],
+}
+```
+
+A monitor takes `http` or `tcp`, then optionally `status` when the endpoint answers something other than 2xx (a registry's `/v2/` answers `401`), `expect` for a substring the body must contain, `slowMs` to move the slow threshold off 3000, and `regions` to check from one side only.
 
 A group marked `infra: true` collapses below the main panel, and the headline and `/api/status` ignore it, so an internal tool going down does not tell a visitor the site is broken. It is still checked and still alerts.
 

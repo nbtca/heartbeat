@@ -110,9 +110,21 @@ code {
 
 .links {
   display: flex;
+  align-items: center;
   gap: 20px;
   font-size: 13.5px;
   color: var(--muted);
+}
+
+.rss {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  margin-right: 6px;
+  vertical-align: -1.5px;
 }
 
 .icon {
@@ -162,7 +174,7 @@ code {
   overflow: hidden;
   background: color-mix(in oklab, var(--c) 9%, var(--surface));
   border-radius: 6px;
-  padding: 26px 28px 28px;
+  padding: 22px 24px 24px;
 }
 
 .banner::before {
@@ -176,11 +188,11 @@ code {
 .banner h1 {
   display: flex;
   align-items: center;
-  gap: 13px;
-  font-size: clamp(27px, 5.6vw, 40px);
-  line-height: 1.08;
-  font-weight: 680;
-  letter-spacing: -0.022em;
+  gap: 11px;
+  font-size: clamp(23px, 4.2vw, 31px);
+  line-height: 1.15;
+  font-weight: 640;
+  letter-spacing: -0.016em;
   margin: 0;
 }
 
@@ -190,8 +202,8 @@ html:lang(zh) .banner h1 {
 }
 
 .banner .icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 
 .lede {
@@ -467,6 +479,14 @@ a.name:hover {
   color: var(--muted);
 }
 
+.note {
+  color: color-mix(in oklab, var(--c) 78%, var(--ink));
+  background: color-mix(in oklab, var(--c) 15%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 550;
+}
+
 .uptime {
   margin-left: auto;
   color: var(--muted);
@@ -639,10 +659,10 @@ a.name:hover {
 .page-title,
 .detail h1,
 .incident h1 {
-  font-size: clamp(27px, 5.6vw, 40px);
-  line-height: 1.08;
-  font-weight: 680;
-  letter-spacing: -0.022em;
+  font-size: clamp(23px, 4.2vw, 31px);
+  line-height: 1.15;
+  font-weight: 640;
+  letter-spacing: -0.016em;
   margin: 14px 0 0;
 }
 
