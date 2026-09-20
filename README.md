@@ -1,56 +1,32 @@
 # heartbeat
 
-Status page and uptime monitor for NBTCA services, served at <https://status.nbtca.space>. The page is English by default; `/zh` serves the same page in Chinese.
+Status page for NBTCA services at <https://status.nbtca.space>, English by default with Chinese at `/zh`.
 
-- Every service is checked once a minute from two vantage points: Cloudflare's edge (`global`) and a probe inside the China cluster (`cn`).
-- A check has to fail twice in a row before a service is marked down. A probe that stops reporting is shown as offline and ignored, so a dead probe never looks like an outage.
-- The page shows 90 days of uptime per service, a live 60-minute trace, latency per region, TLS expiry, and incidents written as Markdown.
-- Partial and major outages, recoveries, and probe dropouts are pushed to notification-center.
-
-## How it works
-
-```
-Cloudflare Worker, cron every minute          China probe, k8s node with location=china
-  checks from the edge                          checks from inside China
-        │                                               │
-        ▼                                               ▼
-  D1: ticks, days, events  ◀──── POST /api/ingest (Bearer PROBE_TOKEN)
-        │
-        ├─ state changes ──▶ notification-center (NOTIFY_URL)
-        └─ /  /c/:id  /i/:id  /history  /feed.xml  /api/status
-```
-
-| Table | Contents | Retention |
-|---|---|---|
-| `ticks` | one row per region per minute with every result | 30 days |
-| `days` | per-day minutes in each state plus latency histograms | forever |
-| `events` | state transitions, used for alerts and history | forever |
-
-States: operational, degraded (slower than `slowMs` or flapping), partial (fails from one region), major (fails from every reporting region), maintenance. Uptime counts major minutes fully and partial minutes at 0.3, the same weighting Atlassian Statuspage uses. Maintenance and minutes without data are excluded.
+Every service is checked once a minute from two vantage points: Cloudflare's edge (`global`) and a probe inside the China cluster (`cn`). A check has to fail twice in a row before a service is marked down, and a probe that stops reporting is shown as offline and ignored, so a dead probe never looks like an outage. Uptime counts major minutes fully and partial minutes at 0.3, the weighting Atlassian Statuspage uses; maintenance and minutes without data are excluded.
 
 ## Adding a service
 
-Edit [`monitors.ts`](monitors.ts). Both probes pick up the change on the next deploy.
-
-Services are grouped, and a group marked `infra: true` moves out of the main panel into a collapsed "Developer & infrastructure" section, which opens by itself when something in it is wrong. The headline, the 60-minute trace, and `state` in `/api/status` cover the main panel only, so an internal tool going down does not tell a visitor the site is broken. Infrastructure is still checked and still alerts.
-
-Names are English. Give a group or a service a `zh` to have `/zh` show a Chinese name instead; without one it keeps the English. Everything else on the page comes from [`src/text.ts`](src/text.ts), where both languages have to define the same keys or the build fails.
+Edit [`monitors.ts`](monitors.ts); both probes pick it up on the next deploy.
 
 | Field | Meaning |
 |---|---|
 | `id` | stable identifier used in URLs, incidents, and stored data |
-| `name` | English label shown on the page |
+| `name` | English label |
 | `zh` | Chinese label for `/zh`; falls back to `name` |
 | `http` | URL to request; any status below 400 counts as up |
-| `tcp` | `host:port` to open a connection to, instead of `http` |
+| `tcp` | `host:port` to connect to, instead of `http` |
 | `status` | exact status code to expect, e.g. `401` for a registry's `/v2/` |
 | `expect` | substring the response body must contain |
 | `slowMs` | latency above which the check counts as slow (default 3000) |
 | `regions` | limit to `['cn']` or `['global']` |
 
+A group marked `infra: true` collapses into a section below the main panel. The headline, the 60-minute trace and `state` in `/api/status` cover the main panel only, so an internal tool going down does not tell a visitor the site is broken; infrastructure is still checked and still alerts.
+
+Page copy lives in [`src/text.ts`](src/text.ts), where both languages must define the same keys or the build fails.
+
 ## Writing an incident
 
-Add `incidents/<slug>.md`; merging to `main` publishes it. Write incidents in English — they are not translated, and `/zh` shows the same text. Times are China time.
+Add `incidents/<slug>.md`; merging to `main` publishes it. Incidents are English only. Times are China time.
 
 ```md
 ---
@@ -66,49 +42,26 @@ The database connection pool was exhausted. Scaling it up.
 Pool resized, the service is back.
 ```
 
-`impact` is `minor`, `major`, or `critical`, and raises the listed components to degraded, partial, or major while the incident is open. Update statuses are `investigating`, `identified`, `monitoring`, `resolved`. The incident closes at its `resolved` update.
+`impact` is `minor`, `major` or `critical`, and raises the listed components to degraded, partial or major while the incident is open. Update statuses are `investigating`, `identified`, `monitoring`, `resolved`; the incident closes at `resolved`.
 
-Scheduled maintenance declares its window and puts the components into maintenance for that time:
-
-```md
----
-title: Server room rewiring
-impact: maintenance
-components: mc
-start: 2026-09-20 08:00
-end: 2026-09-20 12:00
----
-
-Power is off on Saturday morning; the Minecraft server will be unavailable.
-```
-
-Add a `## completed <time>` update to end it early. Bodies support paragraphs, `- ` lists, `` `code` ``, and `[links](https://…)`. The build fails on unknown components or malformed files.
+`impact: maintenance` takes `start` and `end` instead, and puts the components into maintenance for that window until a `## completed <time>` update ends it. Bodies support paragraphs, `- ` lists, `` `code` `` and `[links](https://…)`. The build fails on unknown components or malformed files.
 
 ## Setup
 
-1. Create the database and put its id into `wrangler.jsonc`:
-   ```sh
-   npx wrangler d1 create heartbeat
-   ```
-2. Set the secrets:
-   ```sh
-   npx wrangler secret put PROBE_TOKEN
-   npx wrangler secret put NOTIFY_TOKEN
-   ```
-   `NOTIFY_TOKEN` must match the `heartbeat` key in notification-center's `auth` config.
-3. Add the `CLOUDFLARE_API_TOKEN` repository secret and the `CLOUDFLARE_ACCOUNT_ID` repository variable. Until the variable is set, CI skips the deploy job; afterwards every push to `main` migrates D1 and deploys the Worker. The probe image `ghcr.io/nbtca/heartbeat-probe` is published on every push to `main` regardless.
-4. Run the probe in the cluster:
-   ```sh
-   kubectl create secret generic heartbeat-probe --from-literal=token=<PROBE_TOKEN>
-   kubectl apply -f probe/deploy.yaml
-   ```
+```sh
+npx wrangler d1 create heartbeat          # put the id into wrangler.jsonc
+npx wrangler secret put PROBE_TOKEN
+npx wrangler secret put NOTIFY_TOKEN      # matches the heartbeat key in notification-center
+kubectl create secret generic heartbeat-probe --from-literal=token=<PROBE_TOKEN>
+kubectl apply -f probe/deploy.yaml
+```
+
+Pushing to `main` deploys once the `CLOUDFLARE_API_TOKEN` secret and `CLOUDFLARE_ACCOUNT_ID` variable exist; until then CI skips the deploy job.
 
 ## Development
 
 ```sh
-npm ci
-npm test
-npm run check
+npm ci && npm test && npm run check
 echo 'PROBE_TOKEN=dev' > .dev.vars
 npx wrangler d1 migrations apply heartbeat --local
 npm run dev
@@ -116,11 +69,9 @@ curl 'http://localhost:8787/__scheduled?cron=*+*+*+*+*'
 HEARTBEAT_URL=http://localhost:8787 PROBE_TOKEN=dev npm run probe
 ```
 
-The probe runs TypeScript directly on Node 24 and imports the same check code as the Worker.
-
 ## API
 
-`GET /api/status` returns the current state of every service:
+`GET /api/status`:
 
 ```json
 {
@@ -132,4 +83,6 @@ The probe runs TypeScript directly on Node 24 and imports the same check code as
 }
 ```
 
-Alerts are posted to `NOTIFY_URL` as `{ "source": "heartbeat", "text", "url", "monitor", "state", "previous", "ts" }`.
+Alerts go to `NOTIFY_URL` as `{ "source": "heartbeat", "text", "url", "monitor", "state", "previous", "ts" }`.
+
+[`src/logo.svg`](src/logo.svg) is the association's seal from the `NBTCA - LOGO` master, recoloured through `currentColor` and otherwise untouched. The `favicon.svg` on nbtca.space is Astro's default, not the association's mark.

@@ -8,15 +8,28 @@ const TZ = 'Asia/Shanghai'
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 const zhCat = (a: string, b: string) => ((/[\w)]$/.test(a) && /^[一-鿿]/.test(b)) || (/[一-鿿]$/.test(a) && /^[\w(]/.test(b)) ? `${a} ${b}` : a + b)
 
-function clock(locale: string) {
+function intl(locale: string) {
   const fmt = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, { timeZone: TZ, ...opts })
   const dateFmt = fmt({ month: 'long', day: 'numeric', weekday: 'short' })
   const timeFmt = fmt({ hour: '2-digit', minute: '2-digit', hour12: false })
   const fullFmt = fmt({ year: 'numeric', month: 'long', day: 'numeric' })
   const monthFmt = fmt({ year: 'numeric', month: 'long' })
+  const spanFmt = new Intl.DurationFormat(locale, { style: 'long' })
   const date = (ts: number) => dateFmt.format(ts * 1000)
   const time = (ts: number) => timeFmt.format(ts * 1000)
-  return { date, time, fullDate: (ts: number) => fullFmt.format(ts * 1000), month: (ts: number) => monthFmt.format(ts * 1000), dateTime: (ts: number) => `${date(ts)} ${time(ts)}` }
+  return {
+    date,
+    time,
+    fullDate: (ts: number) => fullFmt.format(ts * 1000),
+    month: (ts: number) => monthFmt.format(ts * 1000),
+    dateTime: (ts: number) => `${date(ts)} ${time(ts)}`,
+    duration: (seconds: number) => {
+      const m = Math.max(1, Math.round(seconds / 60))
+      if (m < 60) return spanFmt.format({ minutes: m })
+      if (m < 1440) return spanFmt.format({ hours: Math.floor(m / 60), minutes: m % 60 })
+      return spanFmt.format({ days: Math.floor(m / 1440), hours: Math.floor((m % 1440) / 60) })
+    },
+  }
 }
 
 const en = {
@@ -27,7 +40,6 @@ const en = {
   otherHref: '/zh',
   scope: (names: string) => ` affecting ${names}`,
   ongoing: (range: string) => `In progress, ${range}`,
-  metaJoin: '. ',
   site: 'NBTCA Status',
   desc: 'Live status, uptime and incident history for NBTCA services',
   subscribe: 'Subscribe',
@@ -80,7 +92,7 @@ const en = {
   impact: { minor: 'Minor', major: 'Major', critical: 'Critical', maintenance: 'Scheduled maintenance' } as Record<Impact, string>,
   headline: { degraded: 'Some services are slow', partial: 'Some services are partly down', major: 'Some services are down', maintenance: 'Some services are under maintenance' } as Partial<Record<State, string>>,
   cat: (a: string, b: string) => `${a} ${b}`,
-  stop: '.',
+  stop: '. ',
   listSep: ', ',
   colon: ': ',
   paren: (s: string) => ` (${s})`,
@@ -88,7 +100,7 @@ const en = {
   count: (n: number) => plural(n, 'service'),
   uptime: (p: string) => `${p} uptime`,
   everyFine: (n: number) => `${plural(n, 'service')} running normally.`,
-  restFine: (n: number) => (n ? ` ${plural(n, 'other service')} running normally.` : ''),
+  restFine: (n: number) => (n ? `${plural(n, 'other service')} running normally.` : ''),
   probeLabel: (region: string) => `${region} probe`,
   probeOff: (region: string) => `${region} probe offline`,
   probeDown: (region: string) => `The ${region} probe went offline; the page now shows the other probe only`,
@@ -114,13 +126,7 @@ const en = {
   from: (t: string) => `From ${t}`,
   between: (a: string, b: string) => `${a} to ${b}`,
   plannedFor: (t: string) => `Scheduled for ${t}`,
-  duration: (seconds: number) => {
-    const m = Math.max(1, Math.round(seconds / 60))
-    if (m < 60) return plural(m, 'minute')
-    if (m < 1440) return plural(Math.floor(m / 60), 'hour') + (m % 60 ? ` ${plural(m % 60, 'minute')}` : '')
-    return plural(Math.floor(m / 1440), 'day') + (m % 1440 >= 60 ? ` ${plural(Math.floor((m % 1440) / 60), 'hour')}` : '')
-  },
-  ...clock('en'),
+  ...intl('en'),
 }
 
 export type Text = typeof en
@@ -133,7 +139,6 @@ const zh: Text = {
   otherHref: '/',
   scope: (names) => `，涉及${names}`,
   ongoing: (range) => `维护中，${range}`,
-  metaJoin: '。',
   site: 'NBTCA 服务状态',
   desc: 'NBTCA 各项服务的实时状态、可用率与事件记录',
   subscribe: '订阅更新',
@@ -212,13 +217,7 @@ const zh: Text = {
   from: (t) => `${t} 起`,
   between: (a, b) => `${a} 至 ${b}`,
   plannedFor: (t) => `计划于${t}`,
-  duration: (seconds) => {
-    const m = Math.max(1, Math.round(seconds / 60))
-    if (m < 60) return `${m} 分钟`
-    if (m < 1440) return `${Math.floor(m / 60)} 小时${m % 60 ? ` ${m % 60} 分钟` : ''}`
-    return `${Math.floor(m / 1440)} 天${m % 1440 >= 60 ? ` ${Math.floor((m % 1440) / 60)} 小时` : ''}`
-  },
-  ...clock('zh-CN'),
+  ...intl('zh-CN'),
 }
 
 export const TEXT: Record<Lang, Text> = { en, zh }

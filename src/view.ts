@@ -28,6 +28,12 @@ const list = (items: unknown[], sep: string) => items.flatMap((x, i) => (i ? [se
 
 const icon = (s: State) => html`<svg class="icon" data-state="${s}" aria-hidden="true"><use href="#i-${s}"/></svg>`
 const badge = (s: State, t: Text) => html`<span class="badge">${icon(s)}${t.state[s]}</span>`
+const CHEV = raw('<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>')
+
+const heading = (state: State, name: string, n: number, t: Text) =>
+  html`${icon(state)}<span class="name">${name}</span>${
+    calm(state) ? html`<span class="count">${t.count(n)}</span>` : html`<span class="note">${t.state[state]}</span>`
+  }`
 
 const SPRITE = raw(`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <symbol id="i-operational" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" stroke="none"/><path fill="none" d="M4.8 8.3l2.1 2.1 4.3-4.6"/></symbol>
@@ -182,9 +188,7 @@ function group(g: Group, l: Live, days: string[], counts: (id: string) => (Count
     return { color: barColor(combine(cs)), tip: tip(d, lines, cs.some(measured), related(ids, d, l.ts), t) }
   })
   return html`<details class="group" data-key="${g.name}"${calm(state) ? '' : raw(' open')}>
-<summary><span class="row">${icon(state)}<span class="name">${name}</span>${
-    calm(state) ? html`<span class="count">${t.count(g.items.length)}</span>` : html`<span class="note">${t.state[state]}</span>`
-  }<span class="uptime">${t.uptime(pct(up))}</span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></span>${strip(
+<summary><span class="row">${heading(state, name, g.items.length, t)}<span class="uptime">${t.uptime(pct(up))}</span>${CHEV}</span>${strip(
     cells,
     `${name} ${t.uptime(pct(up))}`,
   )}</summary>
@@ -197,9 +201,7 @@ function advanced(gs: Group[], l: Live, days: string[], counts: (id: string) => 
   const items = gs.flatMap((g) => g.items)
   const state = worst(items.map((m) => l.verdicts.get(m.id)!.state))
   return html`<details class="advanced" data-key="infra"${calm(state) ? '' : raw(' open')}>
-<summary>${icon(state)}<span class="name">${t.infra}</span>${
-    calm(state) ? html`<span class="count">${t.count(items.length)}</span>` : html`<span class="note">${t.state[state]}</span>`
-  }<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+<summary>${heading(state, t.infra, items.length, t)}${CHEV}</summary>
 <div class="panel">${gs.map((g) => group(g, l, days, counts))}</div>
 </details>`
 }
@@ -227,7 +229,7 @@ function notice(i: Incident, ts: number, t: Text) {
   const when = i.impact === 'maintenance' ? (ts < i.start ? t.plannedFor(range(i, t)) : t.ongoing(range(i, t))) : t.starts(t.dateTime(i.start))
   return html`<article class="notice" data-state="${IMPACT_STATE[i.impact]}">
 <h2><a href="${at(t, `/i/${i.id}`)}">${i.title}</a></h2>
-<p class="meta">${t.impact[i.impact]}${scope}${t.metaJoin}${when}</p>
+<p class="meta">${t.impact[i.impact]}${scope}${t.stop}${when}</p>
 ${u ? html`<div class="update"><p class="status">${t.status[u.status]}<time>${t.dateTime(u.ts)}</time></p>${raw(u.html)}</div>` : raw(i.html)}
 </article>`
 }
@@ -382,7 +384,7 @@ export function incident(id: string, t: Text): Page | undefined {
     title: i.title,
     body: html`<a class="back" href="${at(t)}">${t.back}</a>
 <article class="incident">
-<p class="kind">${icon(IMPACT_STATE[i.impact])}${t.impact[i.impact]}${t.metaJoin}${phase}</p>
+<p class="kind">${icon(IMPACT_STATE[i.impact])}${t.impact[i.impact]}${t.stop}${phase}</p>
 <h1>${i.title}</h1>
 <p class="meta">${range(i, t)}${i.end !== undefined && i.end <= ts ? t.lastedFor(t.duration(i.end - i.start)) : ''}</p>
 ${links.length ? html`<p class="meta">${t.affects}${t.colon}${list(links, t.listSep)}</p>` : ''}
