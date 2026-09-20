@@ -27,6 +27,15 @@ export default [
     ],
   },
   {
+    name: 'Apps',
+    zh: '应用',
+    items: [
+      { id: 'icloud', name: 'Drive', zh: '网盘', http: 'https://icloud.nbtca.space' },
+      { id: 'papers', name: 'Exam papers', zh: '试卷管理', http: 'https://papers.dev.nbtca.space' },
+      { id: 'link', name: 'Short links', zh: '短链接', http: 'https://link.nbtca.space', status: 400 },
+    ],
+  },
+  {
     name: 'Games',
     zh: '游戏',
     items: [{ id: 'mc', name: 'Minecraft server', zh: 'Minecraft 服务器', tcp: 'orangedog.nbtca.space:25565' }],
@@ -39,7 +48,20 @@ export default [
       { id: 'github-oauth', name: 'GitHub sign-in', zh: 'GitHub 登录', http: 'https://github-oauth.nbtca.space' },
       { id: 'ical', name: 'Calendar feed', zh: '日历订阅', http: 'https://ical.nbtca.space' },
       { id: 'webhook', name: 'Notification center', zh: '消息推送', http: 'https://webhook.nbtca.space' },
+      { id: 'mq', name: 'Message queue', zh: '消息队列', http: 'https://mq.nbtca.space' },
       { id: 'oss', name: 'Object storage', zh: '对象存储', http: 'https://oss.nbtca.space', status: 403 },
+    ],
+  },
+  {
+    name: 'Platform',
+    zh: '平台',
+    infra: true,
+    items: [
+      { id: 'traefik', name: 'Ingress gateway', zh: '入口网关', http: 'https://traefik.app.nbtca.space/api/overview' },
+      { id: 'consul', name: 'Service discovery', zh: '服务发现', http: 'https://consul.app.nbtca.space/v1/status/leader' },
+      { id: 'prometheus', name: 'Metrics', zh: '指标采集', http: 'https://prometheus.app.nbtca.space/-/healthy', status: 401 },
+      { id: 'logs', name: 'Logs', zh: '日志', http: 'https://log.app.nbtca.space' },
+      { id: 'auth-admin', name: 'Sign-on admin', zh: '认证管理', http: 'https://auth-admin.app.nbtca.space/console' },
       { id: 'headscale', name: 'Private network', zh: '内网组网', http: 'https://headscale.app.nbtca.space' },
     ],
   },

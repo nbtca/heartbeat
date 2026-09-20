@@ -7,7 +7,7 @@
   <a href="https://github.com/nbtca/heartbeat/actions/workflows/deploy.yml"><img alt="deploy" src="https://github.com/nbtca/heartbeat/actions/workflows/deploy.yml/badge.svg"></a>
 </p>
 
-<p align="center"><img alt="Eight services, each with ninety days of uptime" src="screenshot.webp" width="820"></p>
+<p align="center"><img alt="Eleven services, each with ninety days of uptime" src="screenshot.webp" width="820"></p>
 
 - Checked every minute from Cloudflare's edge and from a probe inside the China cluster
 - Two failures in a row before a service is marked down; a probe that stops reporting is ignored, not counted as an outage
