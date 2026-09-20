@@ -19,9 +19,8 @@ const net: Net = {
   },
 }
 
-const CACHE = { 'cache-control': 'public, max-age=30' }
+const fresh = () => ({ 'cache-control': `public, max-age=${60 - (Math.floor(Date.now() / 1000) % 60)}` })
 const HTML = {
-  ...CACHE,
   'content-type': 'text/html; charset=utf-8',
   'content-security-policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
@@ -55,11 +54,11 @@ async function ingest(req: Request, env: Bindings) {
   return new Response(null, { status: 204 })
 }
 
-const page = (p: view.Page, t: Text) => new Response(view.layout(p, t), { status: p.status ?? 200, headers: HTML })
+const page = (p: view.Page, t: Text) => new Response(view.layout(p, t), { status: p.status ?? 200, headers: { ...HTML, ...fresh() } })
 
 async function route(url: URL, env: Bindings): Promise<Response> {
-  if (url.pathname === '/feed.xml') return new Response(view.feed(env.SITE_URL), { headers: { ...CACHE, 'content-type': 'application/atom+xml; charset=utf-8' } })
-  if (url.pathname === '/api/status') return Response.json(await view.summary(env.DB), { headers: { ...CACHE, 'access-control-allow-origin': '*' } })
+  if (url.pathname === '/feed.xml') return new Response(view.feed(env.SITE_URL), { headers: { ...fresh(), 'content-type': 'application/atom+xml; charset=utf-8' } })
+  if (url.pathname === '/api/status') return Response.json(await view.summary(env.DB), { headers: { ...fresh(), 'access-control-allow-origin': '*' } })
   const prefixed = url.pathname.match(/^\/zh(\/.*)?$/)
   const t = TEXT[prefixed ? 'zh' : 'en']
   const path = (prefixed ? (prefixed[1] ?? '/') : url.pathname).replace(/^(.+)\/$/, '$1')

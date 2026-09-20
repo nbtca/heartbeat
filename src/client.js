@@ -43,6 +43,10 @@ addEventListener('pointermove', (e) => {
   show(plot, [times[i], ...series.map((s) => `${s.label} ${s.text[i]}`)].join('\n'), r.left + (x / 100) * r.width, r.top, r.bottom)
 })
 
+addEventListener('click', (e) => {
+  for (const d of document.querySelectorAll('details.lang[open]')) if (!d.contains(e.target)) d.open = false
+})
+
 addEventListener('scroll', hide, { passive: true })
 
 const rtf = new Intl.RelativeTimeFormat(document.documentElement.lang || 'en', { numeric: 'auto' })
@@ -78,6 +82,7 @@ async function refresh() {
 }
 
 clock()
+refresh()
 setInterval(clock, 1000)
 setInterval(refresh, 60_000)
 document.addEventListener('visibilitychange', refresh)
