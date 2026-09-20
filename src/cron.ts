@@ -1,5 +1,5 @@
 import { run, type Net } from './check.ts'
-import { byId, incidents, monitors } from './data.ts'
+import { byId, incidents, monitors, SPAN } from './data.ts'
 import * as db from './db.ts'
 import { dayOf, record, sample, stateAt, window, type Verdict } from './status.ts'
 import { TEXT } from './text.ts'
@@ -10,9 +10,9 @@ export type Bindings = Env & { PROBE_TOKEN: string; NOTIFY_TOKEN?: string }
 const ALERT: State[] = ['partial', 'major']
 
 export async function tick(env: Bindings, ts: number, net: Net) {
-  await db.saveTick(env.DB, { region: 'global', ts, results: await run(monitors, 'global', net) })
-  const recent = await db.ticksSince(env.DB, ts - 240)
-  const w = window(recent, ts)
+  await db.saveTick(env.DB, { region: 'global', ts, results: await run(monitors, 'global', net, ts) })
+  const recent = await db.ticksSince(env.DB, ts - SPAN - 60)
+  const w = window(recent, ts, SPAN)
   const verdicts = new Map(monitors.map((m) => [m.id, stateAt(m, w, ts, incidents)]))
   await Promise.all([accumulate(env.DB, ts, recent, verdicts), transition(env, ts, new Set(w.keys()), verdicts)])
   if (ts % 3600 === 0) await db.prune(env.DB, ts - db.RETAIN)

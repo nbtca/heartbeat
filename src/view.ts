@@ -1,6 +1,6 @@
 import { SLOW_MS } from './check.ts'
 import client from './client.js'
-import { byId, core, groups, incidents, monitors } from './data.ts'
+import { byId, core, groups, incidents, monitors, SPAN } from './data.ts'
 import * as db from './db.ts'
 import { html, raw, type Raw } from './html.ts'
 import { escape, type Incident } from './incidents.ts'
@@ -100,8 +100,8 @@ interface Live {
 }
 
 async function live(DB: D1Database, ts: number, t: Text, span = 0): Promise<Live> {
-  const recent = await db.ticksSince(DB, ts - span - 180)
-  const w = window(recent, ts)
+  const recent = await db.ticksSince(DB, ts - span - SPAN)
+  const w = window(recent, ts, SPAN)
   const seen: Partial<Record<Region, number>> = {}
   for (const x of recent) seen[x.region] = Math.max(seen[x.region] ?? 0, x.ts)
   return { ts, t, recent, verdicts: new Map(monitors.map((m) => [m.id, stateAt(m, w, ts, incidents)])), seen }
@@ -175,7 +175,7 @@ function pulse(l: Live) {
   const t = l.t
   const beats = Array.from({ length: 60 }, (_, i) => {
     const at = l.ts - (59 - i) * 60
-    const w = window(l.recent, at)
+    const w = window(l.recent, at, SPAN)
     const vs = core.map((m) => [m, stateAt(m, w, at, incidents)] as const)
     return { at, state: worst(vs.map(([, v]) => v.state)), hurt: vs.filter(([, v]) => !calm(v.state)) }
   })

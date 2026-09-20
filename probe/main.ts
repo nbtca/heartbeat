@@ -42,7 +42,7 @@ async function cycle() {
     console.error('config fetch failed, keeping previous config:', (e as Error).message)
   }
   if (!monitors.length) return
-  const results = await run(monitors, region, net)
+  const results = await run(monitors, region, net, ts)
   const body = JSON.stringify({ region, ts, results })
   for (let attempt = 1; attempt <= 3; attempt++) {
     const res = await fetch(`${url}/api/ingest`, { method: 'POST', headers, body, signal: AbortSignal.timeout(15_000) }).catch((e: Error) => e)

@@ -49,3 +49,13 @@ test('run only includes monitors assigned to the region', async () => {
   )
   assert.deepEqual(Object.keys(results), ['both'])
 })
+
+test('a service with its own interval is only checked when it is due', async () => {
+  const every = [
+    { id: 'fast', name: 'fast', role: 'fast', http: url('/') },
+    { id: 'slow', name: 'slow', role: 'slow', http: url('/'), every: 5 },
+  ]
+  assert.deepEqual(Object.keys(await run(every, 'global', net, 300)).sort(), ['fast', 'slow'])
+  assert.deepEqual(Object.keys(await run(every, 'global', net, 360)), ['fast'])
+  assert.deepEqual(Object.keys(await run(every, 'global', net)).sort(), ['fast', 'slow'])
+})

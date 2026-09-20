@@ -34,7 +34,9 @@ export async function check(m: Monitor, net: Net): Promise<Result> {
   return r
 }
 
-export async function run(monitors: Monitor[], region: Region, net: Net): Promise<Results> {
-  const list = monitors.filter((m) => (m.regions ?? REGIONS).includes(region))
+const due = (m: Monitor, ts?: number) => ts === undefined || ts % ((m.every ?? 1) * 60) === 0
+
+export async function run(monitors: Monitor[], region: Region, net: Net, ts?: number): Promise<Results> {
+  const list = monitors.filter((m) => (m.regions ?? REGIONS).includes(region) && due(m, ts))
   return Object.fromEntries(await Promise.all(list.map(async (m) => [m.id, await check(m, net)] as const)))
 }

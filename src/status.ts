@@ -19,10 +19,12 @@ export function confirm(outcomes: Outcome[]): Outcome | undefined {
 
 export type Window = Map<Region, Results[]>
 
-export function window(ticks: Tick[], ts: number): Window {
+export const SAMPLES = 3
+
+export function window(ticks: Tick[], ts: number, span = SAMPLES * 60): Window {
   const w: Window = new Map()
   for (const t of ticks.toSorted((a, b) => b.ts - a.ts)) {
-    if (t.ts > ts || t.ts <= ts - 180) continue
+    if (t.ts > ts || t.ts <= ts - span) continue
     w.set(t.region, [...(w.get(t.region) ?? []), t.results])
   }
   return w
@@ -39,7 +41,10 @@ export function stateAt(m: Monitor, w: Window, ts: number, incidents: Incident[]
   const seen: Outcome[] = []
   let err: string | undefined
   for (const region of m.regions ?? REGIONS) {
-    const rs = (w.get(region) ?? []).map((r) => r[m.id]).filter((r) => r !== undefined)
+    const rs = (w.get(region) ?? [])
+      .map((r) => r[m.id])
+      .filter((r) => r !== undefined)
+      .slice(0, SAMPLES)
     const v = confirm(rs.map((r) => r.o))
     if (!v) continue
     seen.push(v)

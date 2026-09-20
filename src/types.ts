@@ -11,6 +11,7 @@ export interface Monitor {
   head?: boolean
   status?: number
   expect?: string
+  every?: number
   slowMs?: number
   regions?: Region[]
 }

@@ -86,3 +86,20 @@ test('days are counted in China time', () => {
   assert.equal(dayOf(Date.parse('2026-09-10T16:00:00Z') / 1000), '2026-09-11')
   assert.equal(dayOf(Date.parse('2026-09-10T15:59:59Z') / 1000), '2026-09-10')
 })
+
+test('a verdict reads only the newest samples, however wide the window', () => {
+  const wide = window(ticks('global', ['ok', 'ok', 'fail', 'fail', 'fail']), T, 3600)
+  assert.equal(stateAt(m, wide, T, []).state, 'operational')
+})
+
+test('a service checked every few minutes keeps its verdict between checks', () => {
+  const every = { ...m, every: 5 }
+  const sparse: Tick[] = [0, 5, 10].map((back) => ({
+    region: 'global' as const,
+    ts: T - back * 60,
+    results: { api: { o: 'fail' as const, ms: 100, err: 'HTTP 502' } },
+  }))
+  const idle: Tick[] = [1, 2, 3, 4].map((back) => ({ region: 'global' as const, ts: T - back * 60, results: {} }))
+  const w = window([...sparse, ...idle], T, 3600)
+  assert.deepEqual(stateAt(every, w, T, []), { state: 'major', failed: ['global'], err: 'HTTP 502' })
+})
