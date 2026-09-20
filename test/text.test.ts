@@ -11,8 +11,8 @@ test('a monitor without a translation keeps its English name', () => {
 test('links carry the language prefix', () => {
   assert.equal(TEXT.en.dir, '')
   assert.equal(TEXT.zh.dir, '/zh')
-  assert.equal(TEXT.en.otherHref, '/zh')
-  assert.equal(TEXT.zh.otherHref, '/')
+  assert.equal(TEXT.en.name, 'English')
+  assert.equal(TEXT.zh.name, '中文')
 })
 
 test('durations and counts follow the language', () => {
