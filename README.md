@@ -32,6 +32,8 @@ States: operational, degraded (slower than `slowMs` or flapping), partial (fails
 
 Edit [`monitors.ts`](monitors.ts). Both probes pick up the change on the next deploy.
 
+Services are grouped, and a group marked `infra: true` moves out of the main panel into a collapsed "开发与基础设施" section, which opens by itself when something in it is wrong. The headline, the 60-minute trace, and `state` in `/api/status` cover the main panel only, so an internal tool going down does not tell a visitor the site is broken. Infrastructure is still checked and still alerts.
+
 | Field | Meaning |
 |---|---|
 | `id` | stable identifier used in URLs, incidents, and stored data |
@@ -122,7 +124,7 @@ The probe runs TypeScript directly on Node 24 and imports the same check code as
   "state": "operational",
   "updated": 1757550000,
   "probes": { "cn": 1757550000, "global": 1757550000 },
-  "groups": [{ "name": "维修服务", "components": [{ "id": "api", "name": "维修 API", "state": "operational", "since": 1757000000, "failed": [], "error": null }] }],
+  "groups": [{ "name": "维修服务", "infra": false, "components": [{ "id": "api", "name": "维修 API", "state": "operational", "since": 1757000000, "failed": [], "error": null }] }],
   "incidents": []
 }
 ```

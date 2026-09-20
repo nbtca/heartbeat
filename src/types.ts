@@ -15,6 +15,7 @@ export interface Monitor {
 export interface Group {
   name: string
   items: Monitor[]
+  infra?: boolean
 }
 
 export type Outcome = 'ok' | 'slow' | 'fail'

@@ -21,27 +21,29 @@ export default [
     items: [
       { id: 'auth', name: '统一认证', http: 'https://auth.app.nbtca.space/oidc/.well-known/openid-configuration' },
       { id: 'myid', name: '个人中心', http: 'https://myid.app.nbtca.space' },
-      { id: 'github-oauth', name: 'GitHub 登录', http: 'https://github-oauth.nbtca.space' },
-    ],
-  },
-  {
-    name: '工具',
-    items: [
-      { id: 'ical', name: '日历订阅', http: 'https://ical.nbtca.space' },
-      { id: 'webhook', name: '消息推送', http: 'https://webhook.nbtca.space' },
-      { id: 'headscale', name: '内网组网', http: 'https://headscale.app.nbtca.space' },
-      { id: 'oss', name: '对象存储', http: 'https://oss.nbtca.space', status: 403 },
-    ],
-  },
-  {
-    name: '镜像站',
-    items: [
-      { id: 'docker-mirror', name: 'Docker Hub 镜像', http: 'https://docker.mirror.nbtca.space/v2/', status: 401 },
-      { id: 'ghcr-mirror', name: 'GHCR 镜像', http: 'https://ghcr.mirror.nbtca.space/v2/', status: 401 },
     ],
   },
   {
     name: '游戏',
     items: [{ id: 'mc', name: 'Minecraft 服务器', tcp: 'orangedog.nbtca.space:25565' }],
+  },
+  {
+    name: '接口与工具',
+    infra: true,
+    items: [
+      { id: 'github-oauth', name: 'GitHub 登录', http: 'https://github-oauth.nbtca.space' },
+      { id: 'ical', name: '日历订阅', http: 'https://ical.nbtca.space' },
+      { id: 'webhook', name: '消息推送', http: 'https://webhook.nbtca.space' },
+      { id: 'oss', name: '对象存储', http: 'https://oss.nbtca.space', status: 403 },
+      { id: 'headscale', name: '内网组网', http: 'https://headscale.app.nbtca.space' },
+    ],
+  },
+  {
+    name: '镜像站',
+    infra: true,
+    items: [
+      { id: 'docker-mirror', name: 'Docker Hub 镜像', http: 'https://docker.mirror.nbtca.space/v2/', status: 401 },
+      { id: 'ghcr-mirror', name: 'GHCR 镜像', http: 'https://ghcr.mirror.nbtca.space/v2/', status: 401 },
+    ],
   },
 ] satisfies Group[]

@@ -1,6 +1,6 @@
 import { SLOW_MS } from './check.ts'
 import client from './client.js'
-import { byId, groups, incidents, monitors } from './data.ts'
+import { byId, core, groups, incidents, monitors } from './data.ts'
 import * as db from './db.ts'
 import { html, raw, type Raw } from './html.ts'
 import { escape, type Incident } from './incidents.ts'
@@ -124,19 +124,19 @@ function explain(m: Monitor, v: Verdict, ts: number): string {
 
 function hero(l: Live) {
   const state = (m: Monitor) => l.verdicts.get(m.id)!.state
-  const affected = monitors.filter((m) => !calm(state(m)))
-  const fine = monitors.filter((m) => state(m) === 'operational').length
+  const affected = core.filter((m) => !calm(state(m)))
+  const fine = core.filter((m) => state(m) === 'operational').length
   const rest = fine ? `其余 ${fine} 项服务运行正常。` : ''
-  const overall = worst(monitors.map(state))
+  const overall = worst(core.map(state))
   const [title, lede] =
     overall === 'nodata'
       ? ['正在收集数据', '探测点上报第一批结果后，这里会显示各项服务的状态。']
       : !affected.length
-        ? ['一切正常', `全部 ${monitors.length} 项服务运行正常。`]
+        ? ['一切正常', `全部 ${core.length} 项服务运行正常。`]
         : affected.length === 1
           ? [cat(affected[0].name, STATE[state(affected[0])]), `${explain(affected[0], l.verdicts.get(affected[0].id)!, l.ts)}。${rest}`]
           : [HEADLINE[overall]!, `${affected.map((m) => cat(m.name, STATE[state(m)])).join('、')}。${rest}`]
-  return html`<section class="hero"><h1>${title}</h1><p class="lede">${lede}</p>${probes(l)}${pulse(l)}</section>`
+  return html`<section class="hero"><div class="banner" data-state="${overall}"><h1>${icon(overall)}${title}</h1><p class="lede">${lede}</p></div></section>`
 }
 
 function probes(l: Live) {
@@ -152,7 +152,7 @@ function pulse(l: Live) {
   const beats = Array.from({ length: 60 }, (_, i) => {
     const t = l.ts - (59 - i) * 60
     const w = window(l.recent, t)
-    const vs = monitors.map((m) => [m, stateAt(m, w, t, incidents)] as const)
+    const vs = core.map((m) => [m, stateAt(m, w, t, incidents)] as const)
     return { t, state: worst(vs.map(([, v]) => v.state)), hurt: vs.filter(([, v]) => !calm(v.state)) }
   })
   const latest = Math.max(0, ...Object.values(l.seen))
@@ -184,11 +184,22 @@ function group(g: Group, l: Live, days: string[], counts: (id: string) => (Count
   return html`<details class="group" data-key="${g.name}"${calm(state) ? '' : raw(' open')}>
 <summary><span class="row">${icon(state)}<span class="name">${g.name}</span>${
     calm(state) ? html`<span class="count">${g.items.length} 项</span>` : html`<span class="note">${STATE[state]}</span>`
-  }<span class="uptime">${pct(up)}</span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></span>${strip(
+  }<span class="uptime">${pct(up)} 可用</span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></span>${strip(
     cells,
     `${g.name}过去 90 天可用率 ${pct(up)}`,
   )}</summary>
 <ul class="members">${g.items.map((m, j) => member(m, l.verdicts.get(m.id)!, days, per[j], l.ts))}</ul>
+</details>`
+}
+
+function advanced(gs: Group[], l: Live, days: string[], counts: (id: string) => (Counts | undefined)[]) {
+  const items = gs.flatMap((g) => g.items)
+  const state = worst(items.map((m) => l.verdicts.get(m.id)!.state))
+  return html`<details class="advanced" data-key="infra"${calm(state) ? '' : raw(' open')}>
+<summary>${icon(state)}<span class="name">开发与基础设施</span>${
+    calm(state) ? html`<span class="count">${items.length} 项</span>` : html`<span class="note">${STATE[state]}</span>`
+  }<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+<div class="panel">${gs.map((g) => group(g, l, days, counts))}</div>
 </details>`
 }
 
@@ -198,7 +209,7 @@ function member(m: Monitor, v: Verdict, days: string[], cs: (Counts | undefined)
   const where = v.failed.length === 1 && v.state === 'partial' ? `（${REGION[v.failed[0]]}）` : ''
   return html`<li><div class="row">${icon(v.state)}<a class="name" href="/c/${m.id}">${m.name}</a>${
     v.state === 'operational' ? '' : html`<span class="note">${STATE[v.state]}${where}</span>`
-  }<span class="uptime">${pct(up)}</span></div>${strip(cells, `${m.name}过去 90 天可用率 ${pct(up)}`)}</li>`
+  }<span class="uptime">${pct(up)} 可用</span></div>${strip(cells, `${m.name}过去 90 天可用率 ${pct(up)}`)}</li>`
 }
 
 function range(i: Incident) {
@@ -233,7 +244,12 @@ export async function home(DB: D1Database): Promise<Page> {
 ${open.length ? html`<section class="notices" aria-label="进行中的事件">${open.map((i) => notice(i, ts))}</section>` : ''}
 <section aria-labelledby="services">
 <div class="section-head"><h2 id="services">服务</h2><span>过去 90 天</span></div>
-<div class="panel">${groups.map((g) => group(g, l, days, counts))}</div>
+<ul class="services">${core.map((m) => member(m, l.verdicts.get(m.id)!, days, counts(m.id), l.ts))}</ul>
+${groups.some((g) => g.infra) ? advanced(groups.filter((g) => g.infra), l, days, counts) : ''}
+</section>
+<section aria-labelledby="pulse">
+<div class="section-head"><h2 id="pulse">最近 60 分钟</h2></div>
+${probes(l)}${pulse(l)}
 </section>
 <section aria-labelledby="recent">
 <div class="section-head"><h2 id="recent">近期事件</h2><a href="/history">全部历史</a></div>
@@ -399,11 +415,12 @@ export async function summary(DB: D1Database) {
   const ts = minute()
   const [l, last] = await Promise.all([live(DB, ts), db.lastEvents(DB)])
   return {
-    state: worst([...l.verdicts.values()].map((v) => v.state)),
+    state: worst(core.map((m) => l.verdicts.get(m.id)!.state)),
     updated: ts,
     probes: Object.fromEntries(REGIONS.map((r) => [r, l.seen[r] ?? null])),
     groups: groups.map((g) => ({
       name: g.name,
+      infra: !!g.infra,
       components: g.items.map((m) => {
         const v = l.verdicts.get(m.id)!
         const e = last.get(m.id)
