@@ -61,6 +61,9 @@ async function refresh() {
   const main = document.querySelector('main')
   const next = doc.querySelector('main')
   if (!main || !next) return
+  const style = document.querySelector('style')
+  const restyle = doc.querySelector('style')
+  if (style && restyle && style.textContent !== restyle.textContent) style.textContent = restyle.textContent
   for (const d of main.querySelectorAll('details[open][data-key]')) {
     next.querySelector(`details[data-key="${CSS.escape(d.dataset.key)}"]`)?.setAttribute('open', '')
   }
