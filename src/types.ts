@@ -8,6 +8,7 @@ export interface Monitor {
   zh?: string
   http?: string
   tcp?: string
+  head?: boolean
   status?: number
   expect?: string
   slowMs?: number

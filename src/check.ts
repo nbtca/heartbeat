@@ -14,7 +14,7 @@ async function probe(m: Monitor, net: Net, signal: AbortSignal): Promise<string 
     await net.tcp(m.tcp.slice(0, i), Number(m.tcp.slice(i + 1)), signal)
     return
   }
-  const res = await fetch(m.http!, { signal, redirect: 'manual', headers: { 'user-agent': 'nbtca-heartbeat' } })
+  const res = await fetch(m.http!, { method: m.head ? 'HEAD' : 'GET', signal, redirect: 'manual', headers: { 'user-agent': 'nbtca-heartbeat' } })
   const body = m.expect ? await res.text() : ''
   if (!m.expect) await res.body?.cancel()
   if (m.status ? res.status !== m.status : res.status >= 400) return `HTTP ${res.status}`

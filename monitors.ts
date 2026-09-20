@@ -39,7 +39,7 @@ export default [
     items: [
       { id: 'icloud', name: 'Shared drive', role: 'icloud.nbtca.space', http: 'https://icloud.nbtca.space' },
       { id: 'link', name: 'Short links', role: 'shortlink, link.nbtca.space', zh: 'shortlink，link.nbtca.space', http: 'https://link.nbtca.space', status: 400 },
-      { id: 'ical', name: 'Timetable feed', role: 'calendar, ical.nbtca.space', zh: 'calendar，ical.nbtca.space', http: 'https://ical.nbtca.space' },
+      { id: 'ical', name: 'Timetable feed', role: 'calendar, ical.nbtca.space', zh: 'calendar，ical.nbtca.space', http: 'https://ical.nbtca.space', head: true },
       { id: 'papers', name: 'Exam papers', role: 'papers.dev.nbtca.space', http: 'https://papers.dev.nbtca.space' },
     ],
   },
