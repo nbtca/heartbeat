@@ -42,6 +42,6 @@ export default [
   },
   {
     name: '游戏',
-    items: [{ id: 'mc', name: 'Minecraft 服务器', tcp: 'mc.nbtca.space:25565', regions: ['cn'] }],
+    items: [{ id: 'mc', name: 'Minecraft 服务器', tcp: 'orangedog.nbtca.space:25565' }],
   },
 ] satisfies Group[]
