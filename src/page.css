@@ -116,15 +116,46 @@ code {
   color: var(--muted);
 }
 
-.rss {
+.glyph {
   width: 13px;
   height: 13px;
+  flex: none;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
   stroke-linecap: round;
-  margin-right: 6px;
-  vertical-align: -1.5px;
+  stroke-linejoin: round;
+}
+
+.glyph.solid {
+  fill: currentColor;
+  stroke: none;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.links a,
+.foot a[aria-label] {
+  display: inline-flex;
+  padding: 9px;
+  margin: -9px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.links .glyph,
+.foot .glyph {
+  width: 16px;
+  height: 16px;
+}
+
+.links a:hover,
+.foot a[aria-label]:hover {
+  color: var(--ink);
 }
 
 .icon {
@@ -644,7 +675,6 @@ a.name:hover {
 }
 
 .back {
-  display: inline-block;
   margin-top: 16px;
   font-size: 14px;
   color: var(--muted);

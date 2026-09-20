@@ -29,8 +29,13 @@ const list = (items: unknown[], sep: string) => items.flatMap((x, i) => (i ? [se
 const icon = (s: State) => html`<svg class="icon" data-state="${s}" aria-hidden="true"><use href="#i-${s}"/></svg>`
 const badge = (s: State, t: Text) => html`<span class="badge">${icon(s)}${t.state[s]}</span>`
 const CHEV = raw('<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>')
-const RSS = raw(
-  '<svg class="rss" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.3" cy="12.7" r="1.5" fill="currentColor" stroke="none"/><path d="M2.6 8.1a5.3 5.3 0 0 1 5.3 5.3M2.6 3.6a9.8 9.8 0 0 1 9.8 9.8"/></svg>',
+const glyph = (body: string, solid = false) => raw(`<svg class="glyph${solid ? ' solid' : ''}" viewBox="0 0 16 16" aria-hidden="true">${body}</svg>`)
+const RSS = glyph('<circle cx="3.3" cy="12.7" r="1.5" fill="currentColor" stroke="none"/><path d="M2.6 8.1a5.3 5.3 0 0 1 5.3 5.3M2.6 3.6a9.8 9.8 0 0 1 9.8 9.8"/>')
+const GLOBE = glyph('<circle cx="8" cy="8" r="6.2"/><path d="M1.9 8h12.2M8 1.8a9.6 9.6 0 0 1 0 12.4M8 1.8a9.6 9.6 0 0 0 0 12.4"/>')
+const BACK = glyph('<path d="M9.8 3.6 5.4 8l4.4 4.4"/>')
+const MARK = glyph(
+  '<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>',
+  true,
 )
 
 const heading = (state: State, name: string, n: number, t: Text) =>
@@ -65,9 +70,9 @@ ${SPRITE}
 <div class="wrap">
 <header class="top"><a class="brand" href="${at(t)}"><img src="/logo.svg" alt="" width="28" height="28">${t.site}</a><nav class="links"><a href="${t.otherHref}" lang="${
       t.lang === 'en' ? 'zh-CN' : 'en'
-    }">${t.other}</a><a href="/feed.xml">${RSS}${t.subscribe}</a></nav></header>
+    }" title="${t.other}" aria-label="${t.other}">${GLOBE}</a><a href="/feed.xml" title="${t.subscribe}" aria-label="${t.subscribe}">${RSS}</a></nav></header>
 <main>${p.body}</main>
-<footer class="foot"><span>${t.footer}</span><a href="https://github.com/nbtca/heartbeat">GitHub</a></footer>
+<footer class="foot"><span>${t.footer}</span><a href="https://github.com/nbtca/heartbeat" title="GitHub" aria-label="GitHub">${MARK}</a></footer>
 </div>
 <script>${raw(client)}</script>
 </body></html>`.value
@@ -337,7 +342,7 @@ export async function component(DB: D1Database, id: string, t: Text): Promise<Pa
   const name = label(m, t)
   return {
     title: name,
-    body: html`<a class="back" href="${at(t)}">${t.back}</a>
+    body: html`<a class="back" href="${at(t)}">${BACK}${t.back}</a>
 <section class="detail">
 <h1>${name}</h1>
 <p class="now">${badge(v.state, t)}${since ? html`<span class="meta">${t.since(t.duration(ts - since))}</span>` : ''}${v.err ? html`<code>${v.err}</code>` : ''}</p>
@@ -385,7 +390,7 @@ export function incident(id: string, t: Text): Page | undefined {
   const links = i.components.map((c) => html`<a href="${at(t, `/c/${c}`)}">${byId.has(c) ? label(byId.get(c)!, t) : c}</a>`)
   return {
     title: i.title,
-    body: html`<a class="back" href="${at(t)}">${t.back}</a>
+    body: html`<a class="back" href="${at(t)}">${BACK}${t.back}</a>
 <article class="incident">
 <p class="kind">${icon(IMPACT_STATE[i.impact])}${t.impact[i.impact]}${t.stop}${phase}</p>
 <h1>${i.title}</h1>
@@ -405,7 +410,7 @@ export function history(t: Text): Page {
   const months = Map.groupBy(incidents, (i) => t.month(i.start))
   return {
     title: t.historyTitle,
-    body: html`<a class="back" href="${at(t)}">${t.back}</a>
+    body: html`<a class="back" href="${at(t)}">${BACK}${t.back}</a>
 <h1 class="page-title">${t.historyTitle}</h1>
 ${
   incidents.length
