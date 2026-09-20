@@ -79,7 +79,9 @@ export default {
       return new Response('not found', { status: 404 })
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } })
-    if (url.pathname === '/logo.svg') return new Response(logo, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' } })
+    if (url.pathname === view.LOGO) {
+      return new Response(logo, { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=31536000, immutable' } })
+    }
     const key = new Request(url.origin + url.pathname)
     const hit = await caches.default.match(key)
     if (hit) return hit

@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { label, LANGS, TEXT } from '../src/text.ts'
+import { label, LANGS, role, TEXT } from '../src/text.ts'
 
-test('a monitor without a translation keeps its English name', () => {
-  assert.equal(label({ name: 'Website', zh: '官网' }, TEXT.zh), '官网')
-  assert.equal(label({ name: 'Website', zh: '官网' }, TEXT.en), 'Website')
-  assert.equal(label({ name: 'Object storage' }, TEXT.zh), 'Object storage')
+test('a group without a translation keeps its English name', () => {
+  assert.equal(label({ name: 'Repair service', zh: '维修服务' }, TEXT.zh), '维修服务')
+  assert.equal(label({ name: 'Repair service', zh: '维修服务' }, TEXT.en), 'Repair service')
+  assert.equal(label({ name: 'Mirrors' }, TEXT.zh), 'Mirrors')
+})
+
+test('a project name is never translated, only its remit is', () => {
+  const sunday = { role: 'Repair booking', zh: '维修预约' }
+  assert.equal(role(sunday, TEXT.en), 'Repair booking')
+  assert.equal(role(sunday, TEXT.zh), '维修预约')
+  assert.equal(role({ role: 'Service discovery' }, TEXT.zh), 'Service discovery')
 })
 
 test('links carry the language prefix', () => {

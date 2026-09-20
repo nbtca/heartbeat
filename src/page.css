@@ -547,6 +547,16 @@ html:lang(zh) .section-head h2 {
   letter-spacing: -0.006em;
 }
 
+.role {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.detail .lede {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+
 a.name {
   text-decoration: none;
 }

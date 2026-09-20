@@ -4,9 +4,10 @@ import { byId, core, groups, incidents, monitors } from './data.ts'
 import * as db from './db.ts'
 import { html, raw, type Raw } from './html.ts'
 import { escape, type Incident } from './incidents.ts'
+import logo from './logo.svg'
 import css from './page.css'
 import { barColor, downtime, lastDays, merge, percentile, stateAt, uptime, window, worst, type Counts, type Day, type Verdict } from './status.ts'
-import { label, LANGS, TEXT, type Text } from './text.ts'
+import { label, LANGS, role, TEXT, type Text } from './text.ts'
 import { REGIONS, type Group, type Monitor, type Region, type State, type Tick } from './types.ts'
 
 export interface Page {
@@ -56,6 +57,14 @@ const SPRITE = raw(`<svg width="0" height="0" style="position:absolute" aria-hid
 
 const at = (t: Text, path = '') => `${t.dir}${path}` || '/'
 
+const digest = (s: string) => {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
+export const LOGO = `/logo-${digest(logo)}.svg`
+
 export function layout(p: Page, t: Text): string {
   return `<!doctype html>${
     html`<html lang="${t.locale}"><head>
@@ -63,14 +72,14 @@ export function layout(p: Page, t: Text): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${p.title ? `${p.title} - ${t.site}` : t.site}</title>
 <meta name="description" content="${t.desc}">
-<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="icon" href="${LOGO}" type="image/svg+xml">
 <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="${t.site}">
 ${LANGS.map((l) => html`<link rel="alternate" hreflang="${TEXT[l].locale}" href="${at(TEXT[l])}">`)}
 <style>${raw(css)}</style>
 </head><body>
 ${SPRITE}
 <div class="wrap">
-<header class="top"><a class="brand" href="${at(t)}"><img src="/logo.svg" alt="" width="28" height="28">${t.site}</a><nav class="links"><details class="lang"><summary title="${t.language}" aria-label="${t.language}">${GLOBE}</summary><menu>${LANGS.map((l) => {
+<header class="top"><a class="brand" href="${at(t)}"><img src="${LOGO}" alt="" width="28" height="28">${t.site}</a><nav class="links"><details class="lang"><summary title="${t.language}" aria-label="${t.language}">${GLOBE}</summary><menu>${LANGS.map((l) => {
       const o = TEXT[l]
       return html`<li><a href="${at(o)}" lang="${o.locale}"${l === t.lang ? raw(' aria-current="true"') : ''}>${l === t.lang ? TICK : BLANK}${o.name}</a></li>`
     })}</menu></details><a href="/feed.xml" title="${t.subscribe}" aria-label="${t.subscribe}">${RSS}</a></nav></header>
@@ -146,10 +155,10 @@ function hero(l: Live) {
         ? [t.allGood, t.everyFine(core.length)]
         : affected.length === 1
           ? [
-              t.oneAffected(label(affected[0], t), t.state[state(affected[0])]),
+              t.oneAffected(affected[0].name, t.state[state(affected[0])]),
               `${explain(affected[0], l.verdicts.get(affected[0].id)!, l.ts, t)}${t.stop}${t.restFine(fine)}`,
             ]
-          : [t.headline[overall]!, `${affected.map((m) => t.cat(label(m, t), t.state[state(m)])).join(t.listSep)}${t.stop}${t.restFine(fine)}`]
+          : [t.headline[overall]!, `${affected.map((m) => t.cat(m.name, t.state[state(m)])).join(t.listSep)}${t.stop}${t.restFine(fine)}`]
   return html`<section class="hero"><div class="banner" data-state="${overall}"><h1>${icon(overall)}${title}</h1><p class="lede">${lede}</p></div></section>`
 }
 
@@ -178,7 +187,7 @@ function pulse(l: Live) {
     (b, i) =>
       html`<rect x="${i * 10}" width="10" height="56" data-tip="${[
         t.time(b.at),
-        ...(b.hurt.length ? b.hurt.map(([m, v]) => t.cat(label(m, t), t.state[v.state])) : [b.state === 'nodata' ? t.noData : t.allFine]),
+        ...(b.hurt.length ? b.hurt.map(([m, v]) => t.cat(m.name, t.state[v.state])) : [b.state === 'nodata' ? t.noData : t.allFine]),
       ].join('\n')}"/>`,
   )}</svg><span class="live" data-state="${beats[59].state}"></span></div>
 <figcaption><span>${t.hourAgo}</span><span>${t.now}</span></figcaption>
@@ -195,7 +204,7 @@ function group(g: Group, l: Live, days: string[], counts: (id: string) => (Count
   const name = label(g, t)
   const cells = days.map((d, i) => {
     const cs = per.map((c) => c[i])
-    const lines = g.items.flatMap((m, j) => impact(cs[j], t).map((x) => t.cat(label(m, t), x)))
+    const lines = g.items.flatMap((m, j) => impact(cs[j], t).map((x) => t.cat(m.name, x)))
     return { color: barColor(combine(cs)), tip: tip(d, lines, cs.some(measured), related(ids, d, l.ts), t) }
   })
   return html`<details class="group" data-key="${g.name}"${calm(state) ? '' : raw(' open')}>
@@ -219,12 +228,11 @@ function advanced(gs: Group[], l: Live, days: string[], counts: (id: string) => 
 
 function member(m: Monitor, v: Verdict, days: string[], cs: (Counts | undefined)[], now: number, t: Text) {
   const up = uptime(cs)
-  const name = label(m, t)
   const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i], t), measured(cs[i]), related([m.id], d, now), t) }))
   const where = v.failed.length === 1 && v.state === 'partial' ? t.paren(t.region[v.failed[0]]) : ''
-  return html`<li><div class="row">${icon(v.state)}<a class="name" href="${at(t, `/c/${m.id}`)}">${name}</a>${
+  return html`<li><div class="row">${icon(v.state)}<a class="name" href="${at(t, `/c/${m.id}`)}">${m.name}</a><span class="role">${role(m, t)}</span>${
     v.state === 'operational' ? '' : html`<span class="note" data-state="${v.state}">${t.state[v.state]}${where}</span>`
-  }<span class="uptime">${t.uptime(pct(up))}</span></div>${strip(cells, `${name} ${t.uptime(pct(up))}`)}</li>`
+  }<span class="uptime">${t.uptime(pct(up))}</span></div>${strip(cells, `${m.name} ${t.uptime(pct(up))}`)}</li>`
 }
 
 function range(i: Incident, t: Text) {
@@ -232,7 +240,7 @@ function range(i: Incident, t: Text) {
   return t.date(i.start) === t.date(i.end) ? t.between(t.dateTime(i.start), t.time(i.end)) : t.between(t.dateTime(i.start), t.dateTime(i.end))
 }
 
-const names = (i: Incident, t: Text) => i.components.map((c) => (byId.has(c) ? label(byId.get(c)!, t) : c)).join(t.listSep)
+const names = (i: Incident, t: Text) => i.components.map((c) => byId.get(c)?.name ?? c).join(t.listSep)
 
 function notice(i: Incident, ts: number, t: Text) {
   const u = i.updates[0]
@@ -342,12 +350,12 @@ export async function component(DB: D1Database, id: string, t: Text): Promise<Pa
   const cert = points.findLast((p) => p.r.cert !== undefined)?.r.cert
   const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i], t), measured(cs[i]), related([id], d, ts), t) }))
   const mine = incidents.filter((i) => i.components.includes(id))
-  const name = label(m, t)
   return {
-    title: name,
+    title: m.name,
     body: html`<a class="back" href="${at(t)}">${BACK}${t.back}</a>
 <section class="detail">
-<h1>${name}</h1>
+<h1>${m.name}</h1>
+<p class="lede">${role(m, t)}</p>
 <p class="now">${badge(v.state, t)}${since ? html`<span class="meta">${t.since(t.duration(ts - since))}</span>` : ''}${v.err ? html`<code>${v.err}</code>` : ''}</p>
 <p class="target">${m.http ?? m.tcp}</p>
 <dl class="uptimes">${t.windows.map(([lbl, n]) => html`<div><dt>${t.uptimeOver(lbl)}</dt><dd>${pct(uptime(cs.slice(-n)))}</dd></div>`)}</dl>
@@ -390,7 +398,7 @@ export function incident(id: string, t: Text): Page | undefined {
       : i.end !== undefined && i.end <= ts
         ? t.phase.resolved
         : t.phase.open
-  const links = i.components.map((c) => html`<a href="${at(t, `/c/${c}`)}">${byId.has(c) ? label(byId.get(c)!, t) : c}</a>`)
+  const links = i.components.map((c) => html`<a href="${at(t, `/c/${c}`)}">${byId.get(c)?.name ?? c}</a>`)
   return {
     title: i.title,
     body: html`<a class="back" href="${at(t)}">${BACK}${t.back}</a>

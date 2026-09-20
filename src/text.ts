@@ -223,3 +223,5 @@ const zh: Text = {
 export const TEXT: Record<Lang, Text> = { en, zh }
 
 export const label = (x: { name: string; zh?: string }, t: Text) => (t.lang === 'zh' && x.zh) || x.name
+
+export const role = (m: { role: string; zh?: string }, t: Text) => (t.lang === 'zh' && m.zh) || m.role

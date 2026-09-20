@@ -7,7 +7,7 @@
   <a href="https://github.com/nbtca/heartbeat/actions/workflows/deploy.yml"><img alt="deploy" src="https://github.com/nbtca/heartbeat/actions/workflows/deploy.yml/badge.svg"></a>
 </p>
 
-<p align="center"><img alt="Eleven services, each with ninety days of uptime" src="screenshot.webp" width="820"></p>
+<p align="center"><img alt="The status page, with each service over ninety days" src="screenshot.webp" width="820"></p>
 
 - Checked every minute from Cloudflare's edge and from a probe inside the China cluster
 - Two failures in a row before a service is marked down; a probe that stops reporting is ignored, not counted as an outage
@@ -24,13 +24,13 @@
   name: 'Repair service',
   zh: '维修服务',
   items: [
-    { id: 'repair', name: 'Repair booking', zh: '维修预约', http: 'https://repair.nbtca.space' },
-    { id: 'api', name: 'Repair API', zh: '维修 API', http: 'https://api.nbtca.space/ping' },
+    { id: 'repair', name: 'Repair booking', role: 'Sunday, repair.nbtca.space', zh: 'Sunday，repair.nbtca.space', http: 'https://repair.nbtca.space' },
+    { id: 'api', name: 'Repair API', role: 'Saturday, api.nbtca.space', zh: 'Saturday，api.nbtca.space', http: 'https://api.nbtca.space/ping' },
   ],
 }
 ```
 
-A monitor takes `http` or `tcp`, then optionally `status` when the endpoint answers something other than 2xx (a registry's `/v2/` answers `401`), `expect` for a substring the body must contain, `slowMs` to move the slow threshold off 3000, and `regions` to check from one side only.
+Name a monitor after what a member would recognise — a hostname when that is the clearest label, otherwise what it does — and use `role` for the project behind it and where it lives, with `zh` as the Chinese version. A monitor takes `http` or `tcp`, then optionally `status` when the endpoint answers something other than 2xx (a registry's `/v2/` answers `401`), `expect` for a substring the body must contain, `slowMs` to move the slow threshold off 3000, and `regions` to check from one side only.
 
 A group marked `infra: true` collapses below the main panel, and the headline and `/api/status` ignore it, so an internal tool going down does not tell a visitor the site is broken. It is still checked and still alerts.
 

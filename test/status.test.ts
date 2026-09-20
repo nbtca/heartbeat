@@ -4,7 +4,7 @@ import type { Incident } from '../src/incidents.ts'
 import { barColor, bucket, bucketMs, confirm, dayOf, merge, percentile, record, stateAt, uptime, window, type Day } from '../src/status.ts'
 import type { Monitor, Outcome, Region, Tick } from '../src/types.ts'
 
-const m: Monitor = { id: 'api', name: 'API', http: 'https://example.com' }
+const m: Monitor = { id: 'api', name: 'API', role: 'API', http: 'https://example.com' }
 const T = 1_757_550_000 - (1_757_550_000 % 60)
 
 const ticks = (region: Region, outcomes: Outcome[]): Tick[] =>

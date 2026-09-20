@@ -15,13 +15,13 @@ const url = (path: string) => `http://127.0.0.1:${(server.address() as AddressIn
 const net: Net = { tcp: async () => {} }
 
 test('http checks classify status codes, bodies, and latency', async () => {
-  assert.equal((await check({ id: 'a', name: 'a', http: url('/') }, net)).o, 'ok')
-  assert.deepEqual(await check({ id: 'a', name: 'a', http: url('/502') }, net).then((r) => [r.o, r.err]), ['fail', 'HTTP 502'])
-  assert.equal((await check({ id: 'a', name: 'a', http: url('/401'), status: 401 }, net)).o, 'ok')
-  assert.equal((await check({ id: 'a', name: 'a', http: url('/302') }, net)).o, 'ok')
-  assert.equal((await check({ id: 'a', name: 'a', http: url('/'), expect: 'pong' }, net)).o, 'ok')
-  assert.equal((await check({ id: 'a', name: 'a', http: url('/'), expect: 'nope' }, net)).err, 'unexpected body')
-  assert.equal((await check({ id: 'a', name: 'a', http: url('/slow'), slowMs: 20 }, net)).o, 'slow')
+  assert.equal((await check({ id: 'a', name: 'a', role: 'a', http: url('/') }, net)).o, 'ok')
+  assert.deepEqual(await check({ id: 'a', name: 'a', role: 'a', http: url('/502') }, net).then((r) => [r.o, r.err]), ['fail', 'HTTP 502'])
+  assert.equal((await check({ id: 'a', name: 'a', role: 'a', http: url('/401'), status: 401 }, net)).o, 'ok')
+  assert.equal((await check({ id: 'a', name: 'a', role: 'a', http: url('/302') }, net)).o, 'ok')
+  assert.equal((await check({ id: 'a', name: 'a', role: 'a', http: url('/'), expect: 'pong' }, net)).o, 'ok')
+  assert.equal((await check({ id: 'a', name: 'a', role: 'a', http: url('/'), expect: 'nope' }, net)).err, 'unexpected body')
+  assert.equal((await check({ id: 'a', name: 'a', role: 'a', http: url('/slow'), slowMs: 20 }, net)).o, 'slow')
 })
 
 test('connection errors report the underlying code', async () => {
@@ -29,20 +29,20 @@ test('connection errors report the underlying code', async () => {
   await once(closed, 'listening')
   const { port } = closed.address() as AddressInfo
   closed.close()
-  assert.equal((await check({ id: 'a', name: 'a', http: `http://127.0.0.1:${port}/` }, net)).err, 'ECONNREFUSED')
+  assert.equal((await check({ id: 'a', name: 'a', role: 'a', http: `http://127.0.0.1:${port}/` }, net)).err, 'ECONNREFUSED')
 })
 
 test('tcp checks go through the injected socket adapter', async () => {
   const down: Net = { tcp: async () => Promise.reject(new Error('ECONNREFUSED')) }
-  assert.equal((await check({ id: 'mc', name: 'mc', tcp: 'mc.example.com:25565' }, net)).o, 'ok')
-  assert.equal((await check({ id: 'mc', name: 'mc', tcp: 'mc.example.com:25565' }, down)).err, 'ECONNREFUSED')
+  assert.equal((await check({ id: 'mc', name: 'mc', role: 'mc', tcp: 'mc.example.com:25565' }, net)).o, 'ok')
+  assert.equal((await check({ id: 'mc', name: 'mc', role: 'mc', tcp: 'mc.example.com:25565' }, down)).err, 'ECONNREFUSED')
 })
 
 test('run only includes monitors assigned to the region', async () => {
   const results = await run(
     [
-      { id: 'both', name: 'both', http: url('/') },
-      { id: 'cn', name: 'cn', http: url('/'), regions: ['cn'] },
+      { id: 'both', name: 'both', role: 'both', http: url('/') },
+      { id: 'cn', name: 'cn', role: 'cn', http: url('/'), regions: ['cn'] },
     ],
     'global',
     net,

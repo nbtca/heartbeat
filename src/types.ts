@@ -4,6 +4,7 @@ export const REGIONS: Region[] = ['cn', 'global']
 export interface Monitor {
   id: string
   name: string
+  role: string
   zh?: string
   http?: string
   tcp?: string
