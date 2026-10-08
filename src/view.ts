@@ -440,7 +440,7 @@ export const notFound = (t: Text): Page => ({
 export async function summary(DB: D1Database) {
   const t = TEXT.en
   const ts = minute()
-  const [l, last] = await Promise.all([live(DB, ts, t), db.lastEvents(DB)])
+  const [l, last] = await Promise.all([live(DB, ts, t), db.lastEvents(DB, monitors.map((m) => m.id))])
   return {
     state: worst(core.map((m) => l.verdicts.get(m.id)!.state)),
     updated: ts,

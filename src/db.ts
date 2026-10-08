@@ -49,8 +49,12 @@ export async function saveDay(db: D1Database, day: string, d: Day) {
 const toEvent = (r: { monitor: string; ts: number; state: State; detail: string | null }): Event =>
   r.detail ? { ...r, detail: JSON.parse(r.detail) } : { monitor: r.monitor, ts: r.ts, state: r.state }
 
-export async function lastEvents(db: D1Database): Promise<Map<string, Event>> {
-  const { results } = await db.prepare('SELECT monitor, max(ts) AS ts, state, detail FROM events GROUP BY monitor').all<any>()
+export async function lastEvents(db: D1Database, monitors: string[]): Promise<Map<string, Event>> {
+  // GROUP BY monitor reads the whole table; this seeks once per monitor
+  const { results } = await db
+    .prepare('SELECT e.* FROM json_each(?) j CROSS JOIN events e ON e.monitor = j.value AND e.ts = (SELECT max(ts) FROM events WHERE monitor = j.value)')
+    .bind(JSON.stringify(monitors))
+    .all<any>()
   return new Map(results.map((r) => [r.monitor, toEvent(r)]))
 }
 

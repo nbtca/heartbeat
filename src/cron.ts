@@ -30,11 +30,11 @@ async function accumulate(DB: D1Database, ts: number, recent: Tick[], verdicts: 
 }
 
 async function transition(env: Bindings, ts: number, online: Set<Region>, verdicts: Map<string, Verdict>) {
-  const last = await db.lastEvents(env.DB)
   const now: db.Event[] = [
     ...[...verdicts].map(([monitor, v]) => ({ monitor, ts, state: v.state, ...((v.failed.length || v.err) && { detail: { failed: v.failed, err: v.err } }) })),
     ...REGIONS.filter((r) => r !== 'global').map((r) => ({ monitor: `region:${r}`, ts, state: online.has(r) ? ('operational' as const) : ('nodata' as const) })),
   ]
+  const last = await db.lastEvents(env.DB, now.map((e) => e.monitor))
   const changed = now.filter((e) => last.get(e.monitor)?.state !== e.state)
   if (!changed.length) return
   await db.insertEvents(env.DB, changed)
