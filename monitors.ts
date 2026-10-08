@@ -61,7 +61,7 @@ export default [
         http: 'https://webhook.nbtca.space',
       },
       { id: 'mq', name: 'Message queue', role: 'ServerlessMQ, mq.nbtca.space', zh: 'ServerlessMQ，mq.nbtca.space', http: 'https://mq.nbtca.space' },
-      { id: 'oss', name: 'Object storage', role: 'Aliyun OSS, oss.nbtca.space', zh: '阿里云 OSS，oss.nbtca.space', http: 'https://oss.nbtca.space', status: 403 },
+      { id: 'oss', name: 'Object storage', role: 'Aliyun OSS, oss.nbtca.space', zh: '阿里云 OSS，oss.nbtca.space', http: 'https://oss.nbtca.space', status: 403, slowMs: 5000 },
     ],
   },
   {
