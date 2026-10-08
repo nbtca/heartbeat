@@ -21,6 +21,9 @@ test('confirm needs two consecutive outcomes, newest first', () => {
   assert.equal(confirm(['ok', 'fail', 'fail']), 'fail')
   assert.equal(confirm(['ok', 'ok', 'fail']), 'ok')
   assert.equal(confirm(['ok', 'fail', 'ok']), 'slow')
+  assert.equal(confirm(['ok', 'slow', 'ok']), 'ok')
+  assert.equal(confirm(['slow', 'ok', 'slow']), 'ok')
+  assert.equal(confirm(['slow', 'slow', 'ok']), 'slow')
 })
 
 test('regions combine into a single state', () => {

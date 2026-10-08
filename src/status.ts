@@ -14,7 +14,7 @@ export function worst(states: Iterable<State>): State {
 export function confirm(outcomes: Outcome[]): Outcome | undefined {
   if (!outcomes.length) return
   for (let i = 0; i + 1 < outcomes.length; i++) if (outcomes[i] === outcomes[i + 1]) return outcomes[i]
-  return outcomes.some((o) => o !== 'ok') ? 'slow' : 'ok'
+  return outcomes.includes('fail') ? 'slow' : 'ok'
 }
 
 export type Window = Map<Region, Results[]>
