@@ -340,7 +340,7 @@ export async function component(DB: D1Database, id: string, t: Text): Promise<Pa
     live(DB, ts, t),
     db.loadDays(DB, days[0]),
     db.loadDays(DB, days[DAYS - 30], true),
-    db.series(DB, id, ts - 86400),
+    db.series(DB, id, ts - db.RETAIN),
     db.recentEvents(DB, id),
   ])
   const v = l.verdicts.get(id)!

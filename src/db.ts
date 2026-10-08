@@ -1,7 +1,7 @@
 import type { Day } from './status.ts'
 import type { Region, Result, State, Tick } from './types.ts'
 
-export const RETAIN = 30 * 86400
+export const RETAIN = 86400
 
 export interface Event {
   monitor: string
