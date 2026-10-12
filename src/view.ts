@@ -107,6 +107,11 @@ async function live(DB: D1Database, ts: number, t: Text, span = 0): Promise<Live
   return { ts, t, recent, verdicts: new Map(monitors.map((m) => [m.id, stateAt(m, w, ts, incidents)])), seen }
 }
 
+function players(l: Live, id: string) {
+  const p = l.recent.reduce<Tick | undefined>((a, x) => (x.results[id] && x.ts >= (a?.ts ?? 0) ? x : a), undefined)?.results[id].players
+  return p ? html`<span class="count">${l.t.players(...p)}</span>` : ''
+}
+
 function related(ids: string[], day: string, now: number) {
   const from = noon(day) - 43200
   return incidents.filter((i) => i.components.some((c) => ids.includes(c)) && i.start < from + 86400 && (i.end ?? now) >= from)
@@ -212,7 +217,7 @@ function group(g: Group, l: Live, days: string[], counts: (id: string) => (Count
     cells,
     `${name} ${t.uptime(pct(up))}`,
   )}</summary>
-<ul class="members">${g.items.map((m, j) => member(m, l.verdicts.get(m.id)!, days, per[j], l.ts, t))}</ul>
+<ul class="members">${g.items.map((m, j) => member(m, l.verdicts.get(m.id)!, days, per[j], l))}</ul>
 </details>`
 }
 
@@ -226,11 +231,12 @@ function advanced(gs: Group[], l: Live, days: string[], counts: (id: string) => 
 </details>`
 }
 
-function member(m: Monitor, v: Verdict, days: string[], cs: (Counts | undefined)[], now: number, t: Text) {
+function member(m: Monitor, v: Verdict, days: string[], cs: (Counts | undefined)[], l: Live) {
+  const { ts: now, t } = l
   const up = uptime(cs)
   const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i], t), measured(cs[i]), related([m.id], d, now), t) }))
   const where = v.failed.length === 1 && v.state === 'partial' ? t.paren(t.region[v.failed[0]]) : ''
-  return html`<li><div class="row">${icon(v.state)}<a class="name" href="${at(t, `/c/${m.id}`)}">${m.name}</a><span class="role">${role(m, t)}</span>${
+  return html`<li><div class="row">${icon(v.state)}<a class="name" href="${at(t, `/c/${m.id}`)}">${m.name}</a><span class="role">${role(m, t)}</span>${players(l, m.id)}${
     v.state === 'operational' ? '' : html`<span class="note" data-state="${v.state}">${t.state[v.state]}${where}</span>`
   }<span class="uptime">${t.uptime(pct(up))}</span></div>${strip(cells, `${m.name} ${t.uptime(pct(up))}`)}</li>`
 }
@@ -268,7 +274,7 @@ export async function home(DB: D1Database, t: Text): Promise<Page> {
 ${open.length ? html`<section class="notices" aria-label="${t.recent}">${open.map((i) => notice(i, ts, t))}</section>` : ''}
 <section aria-labelledby="services">
 <div class="section-head"><h2 id="services">${t.services}</h2><span>${t.past90}</span></div>
-<ul class="services">${core.map((m) => member(m, l.verdicts.get(m.id)!, days, counts(m.id), l.ts, t))}</ul>
+<ul class="services">${core.map((m) => member(m, l.verdicts.get(m.id)!, days, counts(m.id), l))}</ul>
 ${groups.some((g) => g.infra) ? advanced(groups.filter((g) => g.infra), l, days, counts) : ''}
 </section>
 <section aria-labelledby="pulse">
@@ -356,7 +362,7 @@ export async function component(DB: D1Database, id: string, t: Text): Promise<Pa
 <section class="detail">
 <h1>${m.name}</h1>
 <p class="lede">${role(m, t)}</p>
-<p class="now">${badge(v.state, t)}${since ? html`<span class="meta">${t.since(t.duration(ts - since))}</span>` : ''}${v.err ? html`<code>${v.err}</code>` : ''}</p>
+<p class="now">${badge(v.state, t)}${since ? html`<span class="meta">${t.since(t.duration(ts - since))}</span>` : ''}${v.err ? html`<code>${v.err}</code>` : ''}${players(l, id)}</p>
 <p class="target">${m.http ?? m.tcp}</p>
 <dl class="uptimes">${t.windows.map(([lbl, n]) => html`<div><dt>${t.uptimeOver(lbl)}</dt><dd>${pct(uptime(cs.slice(-n)))}</dd></div>`)}</dl>
 ${strip(cells, t.uptime(pct(uptime(cs))))}

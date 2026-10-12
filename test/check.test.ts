@@ -56,10 +56,10 @@ test('tcp checks go through the injected socket adapter', async () => {
 
 test('a minecraft check needs a status reply, not just an open port', async () => {
   const mc = { id: 'mc', name: 'mc', role: 'mc', tcp: 'mc.example.com:25565', minecraft: true }
-  const json = [...Buffer.from(JSON.stringify({ version: { name: '1.21' }, description: 'x'.repeat(200) }))]
+  const json = [...Buffer.from(JSON.stringify({ version: { name: '1.21' }, players: { online: 3, max: 20 }, description: 'x'.repeat(200) }))]
   const reply = [0x80 | ((json.length + 3) & 0x7f), (json.length + 3) >> 7, 0, 0x80 | (json.length & 0x7f), json.length >> 7, ...json]
   const up = conn(reply.slice(0, 1), reply.slice(1, 50), reply.slice(50))
-  assert.equal((await check(mc, up.net)).o, 'ok')
+  assert.deepEqual(await check(mc, up.net).then((r) => [r.o, r.players]), ['ok', [3, 20]])
   assert.deepEqual(up.sent, [24, 0, 0xff, 0xff, 0xff, 0xff, 0x0f, 14, ...Buffer.from('mc.example.com'), 0x63, 0xdd, 1, 1, 0])
   assert.equal((await check(mc, conn().net)).err, 'no status reply')
   assert.equal((await check(mc, conn(reply.slice(0, 50)).net)).err, 'no status reply')

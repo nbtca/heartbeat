@@ -26,7 +26,7 @@ function varint(b: Uint8Array, i: number) {
 }
 
 // https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping
-async function ping(conn: Conn, host: string, port: number) {
+async function ping(conn: Conn, host: string, port: number): Promise<Result['players']> {
   const name = new TextEncoder().encode(host)
   const handshake = [0, 0xff, 0xff, 0xff, 0xff, 0x0f, name.length, ...name, port >> 8, port & 0xff, 1]
   await conn.writable.getWriter().write(Uint8Array.from([handshake.length, ...handshake, 1, 0]))
@@ -36,13 +36,16 @@ async function ping(conn: Conn, host: string, port: number) {
     const [size, body] = varint(buf, 0)
     if (buf.length >= body + size) {
       const [length, json] = varint(buf, varint(buf, body)[1])
+      let status
       try {
-        if (JSON.parse(new TextDecoder().decode(buf.subarray(json, json + length))).version) return
+        status = JSON.parse(new TextDecoder().decode(buf.subarray(json, json + length)))
       } catch {}
-      return 'unexpected reply'
+      if (!status?.version) throw new Error('unexpected reply')
+      const { online, max } = status.players ?? {}
+      return Number.isInteger(online) && Number.isInteger(max) ? [online, max] : undefined
     }
     const { value, done } = await reader.read()
-    if (done) return 'no status reply'
+    if (done) throw new Error('no status reply')
     const next = new Uint8Array(buf.length + value.length)
     next.set(buf)
     next.set(value, buf.length)
@@ -50,7 +53,7 @@ async function ping(conn: Conn, host: string, port: number) {
   }
 }
 
-async function probe(m: Monitor, net: Net, signal: AbortSignal): Promise<string | undefined> {
+async function probe(m: Monitor, net: Net, signal: AbortSignal): Promise<Result['players']> {
   if (m.tcp) {
     const i = m.tcp.lastIndexOf(':')
     const host = m.tcp.slice(0, i)
@@ -65,17 +68,19 @@ async function probe(m: Monitor, net: Net, signal: AbortSignal): Promise<string 
   const res = await fetch(m.http!, { method: m.head ? 'HEAD' : 'GET', signal, redirect: 'manual', headers: { 'user-agent': 'nbtca-heartbeat' } })
   const body = m.expect ? await res.text() : ''
   if (!m.expect) await res.body?.cancel()
-  if (m.status ? res.status !== m.status : res.status >= 400) return `HTTP ${res.status}`
-  if (m.expect && !body.includes(m.expect)) return 'unexpected body'
+  if (m.status ? res.status !== m.status : res.status >= 400) throw new Error(`HTTP ${res.status}`)
+  if (m.expect && !body.includes(m.expect)) throw new Error('unexpected body')
 }
 
 export async function check(m: Monitor, net: Net): Promise<Result> {
   const signal = AbortSignal.timeout(TIMEOUT)
   const start = performance.now()
-  const err = await probe(m, net, signal).catch((e: any) => (signal.aborted ? 'timeout' : String(e?.cause?.code ?? e?.cause?.message ?? e?.message ?? e)))
+  let err: string | undefined
+  const players = await probe(m, net, signal).catch((e: any) => void (err = signal.aborted ? 'timeout' : String(e?.cause?.code ?? e?.cause?.message ?? e?.message ?? e)))
   const ms = Math.round(performance.now() - start)
   const r: Result = { o: err ? 'fail' : ms > (m.slowMs ?? SLOW_MS) ? 'slow' : 'ok', ms }
   if (err) r.err = err.slice(0, 120)
+  if (players) r.players = players
   if (net.cert && m.http?.startsWith('https:')) {
     r.cert = await net.cert(new URL(m.http).hostname, AbortSignal.timeout(TIMEOUT)).catch(() => undefined)
   }

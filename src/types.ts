@@ -31,6 +31,7 @@ export interface Result {
   ms: number
   err?: string
   cert?: number
+  players?: [online: number, max: number]
 }
 
 export type Results = Record<string, Result>
