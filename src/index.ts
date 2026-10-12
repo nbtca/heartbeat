@@ -1,5 +1,5 @@
 import { connect } from 'cloudflare:sockets'
-import type { Net } from './check.ts'
+import { aborted, type Net } from './check.ts'
 import { tick, type Bindings } from './cron.ts'
 import { byId, monitors } from './data.ts'
 import { saveTick } from './db.ts'
@@ -11,11 +11,12 @@ import * as view from './view.ts'
 const net: Net = {
   async tcp(hostname, port, signal) {
     const socket = connect({ hostname, port })
-    try {
-      await Promise.race([socket.opened, new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))])
-    } finally {
-      socket.close().catch(() => {})
-    }
+    const close = () => socket.close().catch(() => {})
+    await Promise.race([socket.opened, aborted(signal)]).catch((e) => {
+      close()
+      throw e
+    })
+    return { readable: socket.readable, writable: socket.writable, close }
   },
 }
 

@@ -30,7 +30,7 @@
 }
 ```
 
-Name a monitor after what a member would recognise — a hostname when that is the clearest label, otherwise what it does — and use `role` for the project behind it and where it lives, with `zh` as the Chinese version. A monitor takes `http` or `tcp`, then optionally `status` when the endpoint answers something other than 2xx (a registry's `/v2/` answers `401`), `expect` for a substring the body must contain, `slowMs` to move the slow threshold off 3000, `regions` to check from one side only, `head` to ask for headers only, and `every` to check less often than once a minute when the target rate-limits or is expensive to reach.
+Name a monitor after what a member would recognise — a hostname when that is the clearest label, otherwise what it does — and use `role` for the project behind it and where it lives, with `zh` as the Chinese version. A monitor takes `http` or `tcp`, then optionally `minecraft` to make a `tcp` check wait for a [Server List Ping](https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping) reply instead of settling for an open port, `status` when the endpoint answers something other than 2xx (a registry's `/v2/` answers `401`), `expect` for a substring the body must contain, `slowMs` to move the slow threshold off 3000, `regions` to check from one side only, `head` to ask for headers only, and `every` to check less often than once a minute when the target rate-limits or is expensive to reach.
 
 A group marked `infra: true` collapses below the main panel, and the headline and `/api/status` ignore it, so an internal tool going down does not tell a visitor the site is broken. It is still checked and still alerts.
 

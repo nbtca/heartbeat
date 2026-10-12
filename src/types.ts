@@ -8,6 +8,7 @@ export interface Monitor {
   zh?: string
   http?: string
   tcp?: string
+  minecraft?: boolean
   head?: boolean
   status?: number
   expect?: string

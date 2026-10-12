@@ -3,16 +3,64 @@ import { REGIONS, type Monitor, type Region, type Result, type Results } from '.
 export const TIMEOUT = 10_000
 export const SLOW_MS = 3_000
 
+export interface Conn {
+  readable: ReadableStream<Uint8Array>
+  writable: WritableStream<Uint8Array>
+  close(): unknown
+}
+
 export interface Net {
-  tcp(host: string, port: number, signal: AbortSignal): Promise<void>
+  tcp(host: string, port: number, signal: AbortSignal): Promise<Conn>
   cert?(host: string, signal: AbortSignal): Promise<number>
+}
+
+export const aborted = (signal: AbortSignal) => new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+
+function varint(b: Uint8Array, i: number) {
+  let n = 0
+  for (let shift = 0; ; shift += 7) {
+    if (i >= b.length) return [NaN, i]
+    n |= (b[i] & 0x7f) << shift
+    if (b[i++] < 0x80) return [n, i]
+  }
+}
+
+// https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping
+async function ping(conn: Conn, host: string, port: number) {
+  const name = new TextEncoder().encode(host)
+  const handshake = [0, 0xff, 0xff, 0xff, 0xff, 0x0f, name.length, ...name, port >> 8, port & 0xff, 1]
+  await conn.writable.getWriter().write(Uint8Array.from([handshake.length, ...handshake, 1, 0]))
+  const reader = conn.readable.getReader()
+  let buf = new Uint8Array()
+  for (;;) {
+    const [size, body] = varint(buf, 0)
+    if (buf.length >= body + size) {
+      const [length, json] = varint(buf, varint(buf, body)[1])
+      try {
+        if (JSON.parse(new TextDecoder().decode(buf.subarray(json, json + length))).version) return
+      } catch {}
+      return 'unexpected reply'
+    }
+    const { value, done } = await reader.read()
+    if (done) return 'no status reply'
+    const next = new Uint8Array(buf.length + value.length)
+    next.set(buf)
+    next.set(value, buf.length)
+    buf = next
+  }
 }
 
 async function probe(m: Monitor, net: Net, signal: AbortSignal): Promise<string | undefined> {
   if (m.tcp) {
     const i = m.tcp.lastIndexOf(':')
-    await net.tcp(m.tcp.slice(0, i), Number(m.tcp.slice(i + 1)), signal)
-    return
+    const host = m.tcp.slice(0, i)
+    const port = Number(m.tcp.slice(i + 1))
+    const conn = await net.tcp(host, port, signal)
+    try {
+      return m.minecraft ? await Promise.race([ping(conn, host, port), aborted(signal)]) : undefined
+    } finally {
+      conn.close()
+    }
   }
   const res = await fetch(m.http!, { method: m.head ? 'HEAD' : 'GET', signal, redirect: 'manual', headers: { 'user-agent': 'nbtca-heartbeat' } })
   const body = m.expect ? await res.text() : ''

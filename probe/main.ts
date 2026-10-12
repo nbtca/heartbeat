@@ -1,6 +1,7 @@
 import { connect, type Socket } from 'node:net'
+import { Duplex } from 'node:stream'
 import { connect as tls } from 'node:tls'
-import { run, type Net } from '../src/check.ts'
+import { run, type Conn, type Net } from '../src/check.ts'
 import type { Monitor, Region } from '../src/types.ts'
 
 const url = process.env.HEARTBEAT_URL ?? 'https://status.nbtca.space'
@@ -11,23 +12,27 @@ const headers = { authorization: `Bearer ${token}`, 'content-type': 'application
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-function settle<S extends Socket, T>(socket: S, ready: string, signal: AbortSignal, read: (s: S) => T) {
-  return new Promise<T>((resolve, reject) => {
+function settle<S extends Socket>(socket: S, ready: string, signal: AbortSignal) {
+  return new Promise<S>((resolve, reject) => {
     signal.addEventListener('abort', () => socket.destroy(new Error('timeout')), { once: true })
     socket.once('error', reject)
-    socket.once(ready, () => {
-      resolve(read(socket))
-      socket.destroy()
-    })
+    socket.once(ready, () => resolve(socket))
   })
 }
 
 const net: Net = {
-  tcp: (host, port, signal) => settle(connect({ host, port }), 'connect', signal, () => undefined),
-  cert: (host, signal) =>
-    settle(tls({ host, port: 443, servername: host, rejectUnauthorized: false }), 'secureConnect', signal, (s) =>
-      Math.floor((Date.parse(s.getPeerCertificate().valid_to) - Date.now()) / 86400000),
-    ),
+  async tcp(host, port, signal) {
+    const socket = await settle(connect({ host, port }), 'connect', signal)
+    return { ...(Duplex.toWeb(socket) as unknown as Conn), close: () => socket.destroy() }
+  },
+  async cert(host, signal) {
+    const socket = await settle(tls({ host, port: 443, servername: host, rejectUnauthorized: false }), 'secureConnect', signal)
+    try {
+      return Math.floor((Date.parse(socket.getPeerCertificate().valid_to) - Date.now()) / 86400000)
+    } finally {
+      socket.destroy()
+    }
+  },
 }
 
 let monitors: Monitor[] = []
