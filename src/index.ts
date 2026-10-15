@@ -23,7 +23,7 @@ const net: Net = {
 const fresh = () => ({ 'cache-control': `public, max-age=${60 - (Math.floor(Date.now() / 1000) % 60)}` })
 const HTML = {
   'content-type': 'text/html; charset=utf-8',
-  'content-security-policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+  'content-security-policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://static.cloudflareinsights.com; img-src 'self'; base-uri 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
 }
 const enc = new TextEncoder()
