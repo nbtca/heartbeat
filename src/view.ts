@@ -109,7 +109,7 @@ async function live(DB: D1Database, ts: number, t: Text, span = 0): Promise<Live
 
 function players(l: Live, id: string) {
   const p = l.recent.reduce<Tick | undefined>((a, x) => (x.results[id] && x.ts >= (a?.ts ?? 0) ? x : a), undefined)?.results[id].players
-  return p ? html`<span class="count">${l.t.players(...p)}</span>` : ''
+  return p ? html`<span class="count">${l.t.players(p[0])}</span>` : ''
 }
 
 function related(ids: string[], day: string, now: number) {
@@ -301,7 +301,7 @@ function chart(points: Point[], ts: number, regions: Region[], t: Text) {
       if (p.region === region && p.r.o !== 'fail' && b >= 0 && b < N) bins[b].push(p.r.ms)
     }
     return { region, values: bins.map((b) => (b.length ? b.toSorted((x, y) => x - y)[b.length >> 1] : null)) }
-  })
+  }).filter((s) => s.values.some((v) => v !== null))
   const peak = Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== null)))
   if (!peak) return html`<p class="empty">${t.noLatency}</p>`
   const max = [100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000, 20000].find((n) => n >= peak) ?? peak
@@ -326,11 +326,13 @@ ${[0.5, 1].map((f) => html`<span class="ylabel" style="top:${((y(max * f) / 180)
 }
 
 function latency(lat: Map<string, Day>, days: string[], id: string, regions: Region[], t: Text) {
-  const rows = regions.map((r) => {
-    const h = merge(days.map((d) => lat.get(d)?.lat[id]?.[r]))
-    return [r, percentile(h, 0.5), percentile(h, 0.95)] as const
-  })
-  if (rows.every(([, p50]) => p50 === undefined)) return ''
+  const rows = regions
+    .map((r) => {
+      const h = merge(days.map((d) => lat.get(d)?.lat[id]?.[r]))
+      return [r, percentile(h, 0.5), percentile(h, 0.95)] as const
+    })
+    .filter(([, p50]) => p50 !== undefined)
+  if (!rows.length) return ''
   const cell = (v?: number) => (v === undefined ? '—' : ms(v))
   return html`<table class="lat"><caption>${t.past30}</caption>
 <thead><tr><th scope="col">${t.probe}</th><th scope="col">${t.median}</th><th scope="col">${t.p95}</th></tr></thead>
@@ -353,6 +355,7 @@ export async function component(DB: D1Database, id: string, t: Text): Promise<Pa
   const cs = days.map((d) => stats.get(d)?.stats[id])
   const since = events[0]?.state === v.state ? events[0].ts : undefined
   const regions = m.regions ?? REGIONS
+  const target = (m.http ?? m.tcp)!
   const cert = points.findLast((p) => p.r.cert !== undefined)?.r.cert
   const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i], t), measured(cs[i]), related([id], d, ts), t) }))
   const mine = incidents.filter((i) => i.components.includes(id))
@@ -363,7 +366,7 @@ export async function component(DB: D1Database, id: string, t: Text): Promise<Pa
 <h1>${m.name}</h1>
 <p class="lede">${role(m, t)}</p>
 <p class="now">${badge(v.state, t)}${since ? html`<span class="meta">${t.since(t.duration(ts - since))}</span>` : ''}${v.err ? html`<code>${v.err}</code>` : ''}${players(l, id)}</p>
-<p class="target">${m.http ?? m.tcp}</p>
+${role(m, t).includes(target) ? '' : html`<p class="target">${target}</p>`}
 <dl class="uptimes">${t.windows.map(([lbl, n]) => html`<div><dt>${t.uptimeOver(lbl)}</dt><dd>${pct(uptime(cs.slice(-n)))}</dd></div>`)}</dl>
 ${strip(cells, t.uptime(pct(uptime(cs))))}
 <div class="axis"><span>${t.daysAgo90}</span><span>${t.today}</span></div>

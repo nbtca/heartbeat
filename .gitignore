@@ -4,3 +4,4 @@ dist/
 src/incidents.gen.json
 worker-configuration.d.ts
 .dev.vars
+.playwright-mcp/
