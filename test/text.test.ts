@@ -8,10 +8,11 @@ test('a group without a translation keeps its English name', () => {
   assert.equal(label({ name: 'Mirrors' }, TEXT.zh), 'Mirrors')
 })
 
-test('a project name is never translated, only its remit is', () => {
-  const sunday = { role: 'Repair booking', zh: '维修预约' }
-  assert.equal(role(sunday, TEXT.en), 'Repair booking')
-  assert.equal(role(sunday, TEXT.zh), '维修预约')
+test('a service translates its name and remit, but not the project behind it', () => {
+  const api = { name: 'Repair API', zh: '维修 API', role: 'Saturday, api.nbtca.space', roleZh: 'Saturday，api.nbtca.space' }
+  assert.equal(label(api, TEXT.zh), '维修 API')
+  assert.equal(role(api, TEXT.en), 'Saturday, api.nbtca.space')
+  assert.equal(role(api, TEXT.zh), 'Saturday，api.nbtca.space')
   assert.equal(role({ role: 'Service discovery' }, TEXT.zh), 'Service discovery')
 })
 

@@ -24,13 +24,12 @@
   name: 'Repair service',
   zh: '维修服务',
   items: [
-    { id: 'repair', name: 'Repair booking', role: 'Sunday, repair.nbtca.space', zh: 'Sunday，repair.nbtca.space', http: 'https://repair.nbtca.space' },
-    { id: 'api', name: 'Repair API', role: 'Saturday, api.nbtca.space', zh: 'Saturday，api.nbtca.space', http: 'https://api.nbtca.space/ping' },
+    { id: 'api', name: 'Repair API', zh: '维修 API', role: 'Saturday, api.nbtca.space', roleZh: 'Saturday，api.nbtca.space', http: 'https://api.nbtca.space/ping' },
   ],
 }
 ```
 
-Name a monitor after what a member would recognise — a hostname when that is the clearest label, otherwise what it does — and use `role` for the project behind it and where it lives, with `zh` as the Chinese version. A monitor takes `http` or `tcp`, then optionally `minecraft` to make a `tcp` check wait for a [Server List Ping](https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping) reply instead of settling for an open port, `status` when the endpoint answers something other than 2xx (a registry's `/v2/` answers `401`), `expect` for a substring the body must contain, `slowMs` to move the slow threshold off 3000, `regions` to check from one side only, `head` to ask for headers only, and `every` to check less often than once a minute when the target rate-limits or is expensive to reach.
+Name a monitor after what a member would recognise — a hostname when that is the clearest label, otherwise what it does — and use `role` for the project behind it and where it lives. `zh` and `roleZh` are their Chinese versions; leave a project name such as Saturday untranslated. A monitor takes `http` or `tcp`, then optionally `minecraft` to make a `tcp` check wait for a [Server List Ping](https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping) reply instead of settling for an open port, `status` when the endpoint answers something other than 2xx (a registry's `/v2/` answers `401`), `expect` for a substring the body must contain, `slowMs` to move the slow threshold off 3000, `regions` to check from one side only, `head` to ask for headers only, and `every` to check less often than once a minute when the target rate-limits or is expensive to reach.
 
 A group marked `infra: true` collapses below the main panel, and the headline and `/api/status` ignore it, so an internal tool going down does not tell a visitor the site is broken. It is still checked and still alerts.
 
@@ -42,9 +41,9 @@ Add `incidents/<slug>.md` and merge to `main`. English only, times are China tim
 
 ```md
 ---
-title: Repair bookings could not be submitted
+title: Repair requests could not be submitted
 impact: major
-components: repair, api
+components: api
 ---
 
 ## identified 2026-09-10 21:43
