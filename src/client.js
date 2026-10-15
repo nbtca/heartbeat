@@ -59,7 +59,7 @@ function clock() {
 }
 
 async function refresh() {
-  if (document.hidden) return
+  if (document.hidden || !document.querySelector('.pulse, .detail')) return
   const res = await fetch(location.href, { cache: 'no-store' }).catch(() => null)
   if (!res?.ok) return
   const doc = new DOMParser().parseFromString(await res.text(), 'text/html')
