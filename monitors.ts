@@ -18,6 +18,14 @@ export default [
     ],
   },
   {
+    name: 'Chat bot',
+    zh: '机器人',
+    items: [
+      { id: 'bot-qq', name: 'QQ bot', zh: 'QQ 机器人', role: 'HuaJiBot.NET, connection to OneBot', roleZh: 'HuaJiBot.NET，OneBot 连接状态', http: 'https://bot.app.nbtca.space/qq/healthz' },
+      { id: 'bot-tg', name: 'Telegram bot', zh: 'Telegram 机器人', role: 'HuaJiBot.NET, connection to Telegram', roleZh: 'HuaJiBot.NET，Telegram 连接状态', http: 'https://bot.app.nbtca.space/tg/healthz' },
+    ],
+  },
+  {
     name: 'Accounts',
     zh: '账号',
     items: [
