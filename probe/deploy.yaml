@@ -5,6 +5,8 @@ metadata:
   namespace: default
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: heartbeat-probe
@@ -19,7 +21,32 @@ spec:
         - name: probe
           image: ghcr.mirror.nbtca.space/nbtca/heartbeat-probe:latest
           imagePullPolicy: Always
+          ports:
+            - name: health
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            periodSeconds: 5
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            periodSeconds: 10
+            failureThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            periodSeconds: 30
+            failureThreshold: 3
           env:
+            - name: HEARTBEAT_URL
+              value: https://status.nbtca.space
+            - name: PROBE_REGION
+              value: cn
             - name: PROBE_TOKEN
               valueFrom:
                 secretKeyRef:
