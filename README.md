@@ -65,6 +65,9 @@ kubectl create secret generic heartbeat-probe --from-literal=token=<PROBE_TOKEN>
 kubectl apply -f probe/deploy.yaml
 ```
 
+See [China probe operations](probe/README.md) for cluster diagnosis, health
+endpoints, token provisioning, reproducible image rollout, and acceptance checks.
+
 Pushing to `main` deploys once the `CLOUDFLARE_API_TOKEN` secret and `CLOUDFLARE_ACCOUNT_ID` variable exist.
 
 ## Development
