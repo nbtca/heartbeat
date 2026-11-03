@@ -1,0 +1,30 @@
+name: heartbeat-probe
+services:
+  probe:
+    image: ${PROBE_IMAGE:-ghcr.io/nbtca/heartbeat-probe:latest}
+    build:
+      context: ..
+      dockerfile: probe/Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      HEARTBEAT_URL: ${HEARTBEAT_URL:-https://status.nbtca.space}
+      PROBE_REGION: cn
+      PROBE_TOKEN: ${PROBE_TOKEN:?Set PROBE_TOKEN in the private .env file}
+      HEALTH_PORT: "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.2
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

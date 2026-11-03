@@ -9,7 +9,7 @@
 
 <p align="center"><img alt="The status page, with each service over ninety days" src="screenshot.webp" width="820"></p>
 
-- Checked every minute from Cloudflare's edge and from a probe inside the China cluster
+- Checked every minute from Cloudflare's edge and from a Docker probe on a server in China
 - Two failures in a row before a service is marked down; a probe that stops reporting is ignored, not counted as an outage
 - 90 days of uptime per service, a live 60-minute trace, latency and TLS expiry per region
 - Incidents and maintenance windows written as Markdown in the repo
@@ -61,9 +61,11 @@ Pool resized, the service is back.
 npx wrangler d1 create heartbeat          # put the id into wrangler.jsonc
 npx wrangler secret put PROBE_TOKEN
 npx wrangler secret put NOTIFY_TOKEN      # matches the heartbeat key in notification-center
-kubectl create secret generic heartbeat-probe --from-literal=token=<PROBE_TOKEN>
-kubectl apply -f probe/deploy.yaml
 ```
+
+Deploy the China probe with [Docker Compose](probe/README.md). The production
+server uses Compose; Kubernetes is not required. The probe and Worker must share
+the same PROBE_TOKEN.
 
 Pushing to `main` deploys once the `CLOUDFLARE_API_TOKEN` secret and `CLOUDFLARE_ACCOUNT_ID` variable exist.
 

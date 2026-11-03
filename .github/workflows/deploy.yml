@@ -17,6 +17,26 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - name: Build probe image
+        run: docker build --tag heartbeat-probe:check --file probe/Dockerfile .
+      - name: Validate Compose deployment
+        env:
+          PROBE_TOKEN: ci-placeholder-not-a-secret
+        run: docker compose -f probe/compose.yaml config --quiet
+      - name: Smoke test probe container
+        run: |
+          export PROBE_TOKEN=ci-placeholder-not-a-secret PROBE_IMAGE=heartbeat-probe:check HEARTBEAT_URL=http://127.0.0.1:1
+          docker compose -f probe/compose.yaml up -d --no-build --pull never probe
+          trap 'docker compose -f probe/compose.yaml down' EXIT
+          for attempt in $(seq 1 20); do
+            if docker compose -f probe/compose.yaml exec -T probe node -e "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              docker compose -f probe/compose.yaml exec -T probe node -e "fetch('http://127.0.0.1:8080/readyz').then(r=>process.exit(r.status===503?0:1)).catch(()=>process.exit(1))"
+              exit $?
+            fi
+            sleep 1
+          done
+          docker compose -f probe/compose.yaml logs probe
+          exit 1
 
   worker:
     needs: test
@@ -54,4 +74,6 @@ jobs:
           context: .
           file: probe/Dockerfile
           push: true
-          tags: ghcr.io/nbtca/heartbeat-probe:latest
+          tags: |
+            ghcr.io/nbtca/heartbeat-probe:latest
+            ghcr.io/nbtca/heartbeat-probe:${{ github.sha }}

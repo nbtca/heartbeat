@@ -5,3 +5,8 @@ src/incidents.gen.json
 worker-configuration.d.ts
 .dev.vars
 .playwright-mcp/
+
+# Private deployment credentials
+.env
+.env.*
+!.env.example

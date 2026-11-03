@@ -2,4 +2,4 @@
 !package.json
 !src/check.ts
 !src/types.ts
-!probe/main.ts
+!probe/*.ts
