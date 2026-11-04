@@ -57,7 +57,21 @@ async function ingest(req: Request, env: Bindings) {
 
 const page = (p: view.Page, t: Text) => new Response(view.layout(p, t), { status: p.status ?? 200, headers: { ...HTML, ...fresh() } })
 
+// The free plan's daily D1 limits are shared by the whole Cloudflare account and reset at midnight UTC.
+const isD1Outage = (e: unknown) => /D1_ERROR/.test(String(e)) && /limit|exceeded/i.test(String(e))
+
 async function route(url: URL, env: Bindings): Promise<Response> {
+  try {
+    return await render(url, env)
+  } catch (e) {
+    if (!isD1Outage(e)) throw e
+    if (url.pathname === '/api/status') return Response.json({ error: 'D1 daily limit reached', outage: true }, { status: 503, headers: { 'retry-after': '3600', 'access-control-allow-origin': '*' } })
+    const t = TEXT[url.pathname.startsWith('/zh') ? 'zh' : 'en']
+    return page(view.outage(t), t)
+  }
+}
+
+async function render(url: URL, env: Bindings): Promise<Response> {
   if (url.pathname === '/feed.xml') return new Response(view.feed(env.SITE_URL), { headers: { ...fresh(), 'content-type': 'application/atom+xml; charset=utf-8' } })
   if (url.pathname === '/api/status') return Response.json(await view.summary(env.DB), { headers: { ...fresh(), 'access-control-allow-origin': '*' } })
   const prefixed = url.pathname.match(/^\/zh(\/.*)?$/)
