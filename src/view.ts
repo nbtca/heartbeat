@@ -447,6 +447,12 @@ export const notFound = (t: Text): Page => ({
   body: html`<h1 class="page-title">${t.notFound}</h1><p>${t.notFoundBody}</p><p><a href="${at(t)}">${t.notFoundLink}</a></p>`,
 })
 
+export const outage = (t: Text): Page => ({
+  title: t.outage,
+  status: 503,
+  body: html`<h1 class="page-title">${t.outage}</h1><p>${t.outageBody}</p>`,
+})
+
 export async function summary(DB: D1Database) {
   const t = TEXT.en
   const ts = minute()
