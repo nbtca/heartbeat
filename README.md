@@ -15,6 +15,7 @@
 - Incidents and maintenance windows written as Markdown in the repo
 - English at `/`, Chinese at `/zh`
 - No dependencies: one Worker, one D1 database
+- A few D1 rows read per minute: recent checks, the latest state of each service and the latency chart are packed into single rows, so the cron and every page read those instead of scanning raw history. The account's D1 free tier is shared with other NBTCA services.
 
 ## Adding a service
 

@@ -1,8 +1,9 @@
 import { connect } from 'cloudflare:sockets'
 import { aborted, type Net } from './check.ts'
 import { tick, type Bindings } from './cron.ts'
-import { byId, monitors } from './data.ts'
-import { saveTick } from './db.ts'
+import { byId, monitors, SPAN } from './data.ts'
+import { readState, writeState } from './db.ts'
+import { keep, recentKey, type Packed } from './state.ts'
 import logo from './logo.svg'
 import { TEXT, type Text } from './text.ts'
 import { REGIONS, type Region, type Result, type Results } from './types.ts'
@@ -51,7 +52,10 @@ async function ingest(req: Request, env: Bindings) {
     return new Response('invalid tick', { status: 400 })
   }
   const results = Object.fromEntries(Object.entries(body.results).filter(([id, r]) => byId.has(id) && valid(r))) as Results
-  await saveTick(env.DB, { region, ts: Math.floor(body.ts / 60) * 60, results })
+  const ts = Math.floor(body.ts / 60) * 60
+  const key = recentKey(region)
+  const st = await readState<Packed>(env.DB, [key])
+  await writeState(env.DB, key, keep(st[key] ?? [], { region, ts, results }, Date.now() / 1000, SPAN)).run()
   return new Response(null, { status: 204 })
 }
 
