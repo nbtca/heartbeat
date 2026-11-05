@@ -2,6 +2,7 @@ import { SLOW_MS } from './check.ts'
 import client from './client.js'
 import { byId, core, groups, incidents, monitors, SPAN } from './data.ts'
 import * as db from './db.ts'
+import { BIN, BINS, type Chart, type Packed } from './state.ts'
 import { html, raw, type Raw } from './html.ts'
 import { escape, type Incident } from './incidents.ts'
 import logo from './logo.svg'
@@ -99,12 +100,13 @@ interface Live {
   seen: Partial<Record<Region, number>>
 }
 
-async function live(DB: D1Database, ts: number, t: Text, span = 0): Promise<Live> {
-  const recent = await db.ticksSince(DB, ts - span - SPAN)
+async function live(DB: D1Database, ts: number, t: Text, span = 0, also: (keyof Packed)[] = []): Promise<Live & { st: Partial<Packed> }> {
+  const st = await db.readState<Packed>(DB, ['recent:global', 'recent:cn', ...also])
+  const recent = [...(st['recent:global'] ?? []), ...(st['recent:cn'] ?? [])].filter((x) => x.ts > ts - span - SPAN && x.ts <= ts)
   const w = window(recent, ts, SPAN)
   const seen: Partial<Record<Region, number>> = {}
   for (const x of recent) seen[x.region] = Math.max(seen[x.region] ?? 0, x.ts)
-  return { ts, t, recent, verdicts: new Map(monitors.map((m) => [m.id, stateAt(m, w, ts, incidents)])), seen }
+  return { ts, t, recent, verdicts: new Map(monitors.map((m) => [m.id, stateAt(m, w, ts, incidents)])), seen, st }
 }
 
 function players(l: Live, id: string) {
@@ -289,19 +291,12 @@ ${past.length ? html`<ul class="incidents">${past.map((i) => item(i, t))}</ul>` 
   }
 }
 
-type Point = Awaited<ReturnType<typeof db.series>>[number]
-
-function chart(points: Point[], ts: number, regions: Region[], t: Text) {
-  const N = 288
-  const BIN = 300
-  const start = ts - N * BIN
+function chart(c: Chart | undefined, id: string, regions: Region[], t: Text) {
+  const N = BINS
+  const start = (c?.at ?? minute()) - (N - 1) * BIN
   const series = regions.map((region) => {
-    const bins: number[][] = Array.from({ length: N }, () => [])
-    for (const p of points) {
-      const b = Math.floor((p.ts - start) / BIN)
-      if (p.region === region && p.r.o !== 'fail' && b >= 0 && b < N) bins[b].push(p.r.ms)
-    }
-    return { region, values: bins.map((b) => (b.length ? b.toSorted((x, y) => x - y)[b.length >> 1] : null)) }
+    const row = c?.bins[id]?.[region] ?? []
+    return { region, values: Array.from({ length: N }, (_, i) => row[row.length - N + i] ?? null) }
   }).filter((s) => s.values.some((v) => v !== null))
   const peak = Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== null)))
   if (!peak) return html`<p class="empty">${t.noLatency}</p>`
@@ -345,11 +340,10 @@ export async function component(DB: D1Database, id: string, t: Text): Promise<Pa
   if (!m) return
   const ts = minute()
   const days = lastDays(ts, DAYS)
-  const [l, stats, lat, points, events] = await Promise.all([
-    live(DB, ts, t),
+  const [l, stats, lat, events] = await Promise.all([
+    live(DB, ts, t, 0, ['chart']),
     db.loadDays(DB, days[0]),
     db.loadDays(DB, days[DAYS - 30], true),
-    db.series(DB, id, ts - db.RETAIN),
     db.recentEvents(DB, id),
   ])
   const v = l.verdicts.get(id)!
@@ -357,7 +351,7 @@ export async function component(DB: D1Database, id: string, t: Text): Promise<Pa
   const since = events[0]?.state === v.state ? events[0].ts : undefined
   const regions = m.regions ?? REGIONS
   const target = (m.http ?? m.tcp)!
-  const cert = points.findLast((p) => p.r.cert !== undefined)?.r.cert
+  const cert = l.st.chart?.cert[id]
   const cells = days.map((d, i) => ({ color: barColor(cs[i]), tip: tip(d, impact(cs[i], t), measured(cs[i]), related([id], d, ts), t) }))
   const mine = incidents.filter((i) => i.components.includes(id))
   return {
@@ -372,7 +366,7 @@ ${role(m, t).includes(target) ? '' : html`<p class="target">${target}</p>`}
 ${strip(cells, t.uptime(pct(uptime(cs))))}
 <div class="axis"><span>${t.daysAgo90}</span><span>${t.today}</span></div>
 </section>
-<section class="block"><h2>${t.latency}</h2>${chart(points, ts, regions, t)}${latency(lat, days.slice(-30), id, regions, t)}</section>
+<section class="block"><h2>${t.latency}</h2>${chart(l.st.chart, id, regions, t)}${latency(lat, days.slice(-30), id, regions, t)}</section>
 ${
   cert === undefined
     ? ''
@@ -456,7 +450,8 @@ export const outage = (t: Text): Page => ({
 export async function summary(DB: D1Database) {
   const t = TEXT.en
   const ts = minute()
-  const [l, last] = await Promise.all([live(DB, ts, t), db.lastEvents(DB, monitors.map((m) => m.id))])
+  const l = await live(DB, ts, t, 0, ['last'])
+  const last = l.st.last ?? {}
   return {
     state: worst(core.map((m) => l.verdicts.get(m.id)!.state)),
     updated: ts,
@@ -466,7 +461,7 @@ export async function summary(DB: D1Database) {
       infra: !!g.infra,
       components: g.items.map((m) => {
         const v = l.verdicts.get(m.id)!
-        const e = last.get(m.id)
+        const e = last[m.id]
         return { id: m.id, name: m.name, state: v.state, since: e?.state === v.state ? e.ts : null, failed: v.failed, error: v.err ?? null }
       }),
     })),

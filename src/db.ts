@@ -1,7 +1,5 @@
 import type { Day } from './status.ts'
-import type { Region, Result, State, Tick } from './types.ts'
-
-export const RETAIN = 86400
+import type { Region, State, Tick } from './types.ts'
 
 export interface Event {
   monitor: string
@@ -10,28 +8,26 @@ export interface Event {
   detail?: { failed: Region[]; err?: string }
 }
 
-export async function saveTick(db: D1Database, t: Tick) {
-  await db.prepare('INSERT OR REPLACE INTO ticks (ts, region, results) VALUES (?, ?, ?)').bind(t.ts, t.region, JSON.stringify(t.results)).run()
+// The ticks and the latest event per monitor live in a few packed rows, so the minutely cron and every
+// page read a handful of rows instead of scanning ticks and events.
+export async function readState<T extends object>(db: D1Database, keys: (keyof T & string)[]): Promise<Partial<T>> {
+  const { results } = await db
+    .prepare(`SELECT key, value FROM state WHERE key IN (${keys.map(() => '?').join(', ')})`)
+    .bind(...keys)
+    .all<{ key: string; value: string }>()
+  return Object.fromEntries(results.map((r) => [r.key, JSON.parse(r.value)])) as Partial<T>
 }
 
+export const writeState = (db: D1Database, key: string, value: unknown) =>
+  db.prepare('INSERT OR REPLACE INTO state (key, value) VALUES (?, ?)').bind(key, JSON.stringify(value))
+
+// Kept only to seed the latency chart once after the switch to packed state.
 export async function ticksSince(db: D1Database, since: number): Promise<Tick[]> {
   const { results } = await db
     .prepare('SELECT ts, region, results FROM ticks WHERE ts >= ?')
     .bind(since)
     .all<{ ts: number; region: Region; results: string }>()
   return results.map((r) => ({ ...r, results: JSON.parse(r.results) }))
-}
-
-export async function series(db: D1Database, id: string, since: number) {
-  const { results } = await db
-    .prepare('SELECT ts, region, results -> ? AS r FROM ticks WHERE ts >= ? AND r IS NOT NULL ORDER BY ts')
-    .bind(`$."${id}"`, since)
-    .all<{ ts: number; region: Region; r: string }>()
-  return results.map((x) => ({ ts: x.ts, region: x.region, r: JSON.parse(x.r) as Result }))
-}
-
-export async function prune(db: D1Database, before: number) {
-  await db.prepare('DELETE FROM ticks WHERE ts < ?').bind(before).run()
 }
 
 export async function loadDays(db: D1Database, from: string, lat = false): Promise<Map<string, Day>> {
@@ -48,15 +44,6 @@ export async function saveDay(db: D1Database, day: string, d: Day) {
 
 const toEvent = (r: { monitor: string; ts: number; state: State; detail: string | null }): Event =>
   r.detail ? { ...r, detail: JSON.parse(r.detail) } : { monitor: r.monitor, ts: r.ts, state: r.state }
-
-export async function lastEvents(db: D1Database, monitors: string[]): Promise<Map<string, Event>> {
-  // GROUP BY monitor reads the whole table; this seeks once per monitor
-  const { results } = await db
-    .prepare('SELECT e.* FROM json_each(?) j CROSS JOIN events e ON e.monitor = j.value AND e.ts = (SELECT max(ts) FROM events WHERE monitor = j.value)')
-    .bind(JSON.stringify(monitors))
-    .all<any>()
-  return new Map(results.map((r) => [r.monitor, toEvent(r)]))
-}
 
 export async function recentEvents(db: D1Database, monitor: string, limit = 20): Promise<Event[]> {
   const { results } = await db.prepare('SELECT * FROM events WHERE monitor = ? ORDER BY ts DESC LIMIT ?').bind(monitor, limit).all<any>()
