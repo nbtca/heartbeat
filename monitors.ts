@@ -52,11 +52,6 @@ export default [
     ],
   },
   {
-    name: 'Games',
-    zh: '游戏',
-    items: [{ id: 'mc', name: 'Minecraft', role: 'orangedog.nbtca.space:25565', tcp: 'orangedog.nbtca.space:25565', minecraft: true }],
-  },
-  {
     name: 'Messaging & storage',
     zh: '消息与存储',
     infra: true,
